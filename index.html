@@ -834,7 +834,7 @@ async function renderLancamentos() {
     const valor = parseFloat(r['Valor (R$)']) || 0;
     const valClass = cat.includes('Receita') ? 'val-positive' : 'val-negative';
     return `<tr>
-      <td>${r['Data'] || '—'}</td>
+      <td>${formatDate(r['Data'])}</td>
       <td>${COMPANIES_META[r._empresa]?.name || r._empresa}</td>
       <td><span class="cat-pill ${catClass}">${cat}</span></td>
       <td>${r['Descrição'] || '—'}</td>
@@ -1047,6 +1047,19 @@ document.addEventListener('click', e => { if (e.target.classList.contains('modal
 // ============================================================
 function formatCurrency(v) {
   return 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  // já está no formato DD/MM/AAAA
+  if (typeof d === 'string' && d.includes('/')) return d;
+  // formato ISO ou Date object
+  const dt = new Date(d);
+  if (isNaN(dt)) return String(d);
+  const day = String(dt.getUTCDate()).padStart(2, '0');
+  const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const year = dt.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function nomeMes(n) {
