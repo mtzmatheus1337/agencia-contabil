@@ -914,10 +914,10 @@ function buildSystemPrompt() {
   for (const key in lancamentosContexto) {
     const lancs = lancamentosContexto[key] || [];
     if (lancs.length === 0) continue;
-    lancContext += `\n\n${COMPANIES_META[key].name} — ${lancs.length} lançamentos:\n`;
+    lancContext += '\n\n' + COMPANIES_META[key].name + ' — ' + lancs.length + ' lançamentos:\n';
     lancs.forEach(l => {
       const valLanc = l['Valor (R$)'] || l['Valor'] || 0;
-      lancContext += `  [${formatDate(l['Data'])}] ${l['Categoria']} | ${l['Descrição']} | ${l['Fornecedor']||'—'} | R$ ${Number(valLanc).toLocaleString('pt-BR',{minimumFractionDigits:2})}\n`;
+      lancContext += '  [' + formatDate(l['Data']) + '] ' + l['Categoria'] + ' | ' + (l['Descrição']||'') + ' | ' + (l['Fornecedor']||'—') + ' | R$ ' + Number(valLanc).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '\n';
     });
   }
 
