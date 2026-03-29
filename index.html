@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agência Contábil — Matheus Saldanha Garcia</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f5f3;
+  --surface: #ffffff;
+  --surface2: #f0efed;
+  --surface3: #e8e7e4;
+  --border: #e2e0dc;
+  --border2: #ccc9c4;
+  --text: #1a1917;
+  --text2: #5a5750;
+  --text3: #9a9590;
+  --gold: #8a5f28;
+  --gold2: #6a4515;
+  --green: #1e7a4a;
+  --red: #b83232;
+  --yellow: #a07010;
+  --blue: #2d5fa0;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* LAYOUT */
+.app { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar { width: 240px; min-width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid var(--border); }
+.sidebar-logo .logo-title { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--gold); line-height: 1.2; }
+.sidebar-logo .logo-sub { font-size: 11px; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidebar-section { padding: 20px 16px 8px; }
+.sidebar-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); padding: 0 8px; margin-bottom: 6px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text2); font-size: 13.5px; transition: all 0.15s; border: 1px solid transparent; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--surface3); color: var(--gold); border-color: var(--border); }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; }
+.sidebar-companies { padding: 12px 16px; flex: 1; }
+.company-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
+.company-item:hover { background: var(--surface2); }
+.company-item.active { background: var(--surface2); border-color: var(--border); }
+.company-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.company-name { font-size: 12.5px; color: var(--text2); line-height: 1.2; }
+.company-item.active .company-name { color: var(--text); }
+.company-revenue { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+.api-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text3); }
+.api-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+.api-dot.on { background: var(--green); }
+
+/* MAIN */
+.main { flex: 1; overflow-x: hidden; }
+.topbar { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); position: sticky; top: 0; z-index: 10; }
+.topbar-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); }
+.topbar-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+.btn-primary { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+.btn-primary:hover { background: var(--gold2); }
+.btn-ghost { background: transparent; color: var(--text2); border-color: var(--border2); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* PAGES */
+.page { padding: 28px 32px; display: none; }
+.page.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* LOADING */
+.loading-overlay { display: flex; align-items: center; justify-content: center; padding: 60px; gap: 12px; color: var(--text3); font-size: 13px; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border2); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--gold); opacity: 0.4; }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 10px; }
+.stat-value { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--text); }
+.stat-sub { font-size: 12px; color: var(--text3); margin-top: 6px; }
+
+/* COMPANY CARDS */
+.companies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-bottom: 28px; }
+.company-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: all 0.2s; }
+.company-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+.company-card-header { padding: 18px 20px 14px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.company-card-name { font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--text); margin-bottom: 3px; }
+.company-card-type { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.health-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; }
+.health-green { background: rgba(30,122,74,0.1); color: var(--green); }
+.health-yellow { background: rgba(160,112,16,0.1); color: var(--yellow); }
+.health-red { background: rgba(184,50,50,0.1); color: var(--red); }
+.company-card-body { padding: 16px 20px; }
+.cc-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+.cc-metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 4px; }
+.cc-metric-value { font-size: 15px; font-weight: 500; color: var(--text); }
+.cc-metric-value.good { color: var(--green); }
+.cc-metric-value.warn { color: var(--yellow); }
+.cc-metric-value.bad { color: var(--red); }
+.progress-bar-wrap { margin-bottom: 6px; }
+.progress-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); margin-bottom: 5px; }
+.progress-bar { height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+.fill-green { background: var(--green); }
+.fill-yellow { background: var(--yellow); }
+.fill-red { background: var(--red); }
+.company-card-footer { padding: 12px 20px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; }
+.cc-footer-note { font-size: 11px; color: var(--text3); font-style: italic; }
+.cc-footer-link { font-size: 12px; color: var(--gold); cursor: pointer; }
+
+/* DRE */
+.dre-selector { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.dre-tab { padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text2); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.dre-tab.active { background: var(--gold); color: var(--bg); border-color: var(--gold); font-weight: 600; }
+.dre-container { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
+.dre-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.dre-table-title { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.dre-table-title h3 { font-family: 'DM Serif Display', serif; font-size: 16px; }
+.dre-table-title p { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.dre-table { width: 100%; border-collapse: collapse; }
+.dre-table tr.section-header td { padding: 10px 20px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); background: var(--surface2); border-bottom: 1px solid var(--border); font-weight: 600; border-top: 1px solid var(--border); }
+.dre-table tr.item td { padding: 10px 20px; font-size: 13px; color: var(--text2); border-bottom: 1px solid var(--border); }
+.dre-table tr.item td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.dre-table tr.total td { padding: 12px 20px; font-size: 13.5px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border2); }
+.dre-table tr.total td:last-child { text-align: right; }
+.dre-table tr.grand-total td { padding: 14px 20px; font-family: 'DM Serif Display', serif; font-size: 17px; color: var(--gold); border-top: 2px solid var(--gold); }
+.dre-table tr.grand-total td:last-child { text-align: right; }
+.val-positive { color: var(--green) !important; }
+.val-negative { color: var(--red) !important; }
+.dre-sidebar { display: flex; flex-direction: column; gap: 16px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.metric-card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 12px; }
+.metric-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.metric-item:last-child { border-bottom: none; }
+.metric-item-label { font-size: 12.5px; color: var(--text2); }
+.metric-item-value { font-size: 13px; font-weight: 600; }
+
+/* LANÇAMENTOS */
+.lancamentos-header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 24px; }
+.lancamentos-filters { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+.filter-select { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 7px 12px; cursor: pointer; outline: none; }
+.filter-select:focus { border-color: var(--gold); }
+.lancamentos-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.lancamentos-table { width: 100%; border-collapse: collapse; }
+.lancamentos-table th { padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); border-bottom: 1px solid var(--border); background: var(--surface2); font-weight: 500; }
+.lancamentos-table td { padding: 11px 16px; font-size: 12.5px; color: var(--text2); border-bottom: 1px solid var(--border); }
+.lancamentos-table tr:last-child td { border-bottom: none; }
+.lancamentos-table tr:hover td { background: var(--surface2); }
+.cat-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.cat-cmv { background: rgba(184,50,50,0.12); color: var(--red); }
+.cat-receita { background: rgba(30,122,74,0.12); color: var(--green); }
+.cat-desp { background: rgba(45,95,160,0.12); color: var(--blue); }
+.cat-pessoal { background: rgba(160,112,16,0.12); color: var(--yellow); }
+
+/* FORM */
+.form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; }
+.form-section-title { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group.span2 { grid-column: span 2; }
+.form-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.form-input, .form-select, .form-textarea { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13.5px; padding: 10px 14px; outline: none; transition: border-color 0.15s; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--gold); }
+.form-textarea { resize: vertical; min-height: 80px; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: none; align-items: center; justify-content: center; padding: 24px; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); width: 100%; max-width: 560px; max-height: 85vh; overflow-y: auto; }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.modal-title { font-family: 'DM Serif Display', serif; font-size: 18px; }
+.modal-close { background: none; border: none; color: var(--text3); font-size: 22px; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+/* SETTINGS */
+.settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+.settings-card-title { font-family: 'DM Serif Display', serif; font-size: 16px; margin-bottom: 18px; }
+.api-key-wrap { display: flex; gap: 10px; }
+.api-key-wrap .form-input { flex: 1; }
+.alert { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; border-left: 3px solid; }
+.alert-warn { background: rgba(160,112,16,0.1); border-color: var(--yellow); color: var(--yellow); }
+.alert-ok { background: rgba(30,122,74,0.1); border-color: var(--green); color: var(--green); }
+.alert-info { background: rgba(45,95,160,0.1); border-color: var(--blue); color: var(--blue); }
+
+/* CHAT */
+.chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 73px); max-width: 860px; margin: 0 auto; padding: 0 32px; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 24px 0; display: flex; flex-direction: column; gap: 20px; }
+.chat-msg { display: flex; gap: 12px; align-items: flex-start; }
+.chat-msg.user { flex-direction: row-reverse; }
+.chat-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.avatar-ai { background: var(--gold); color: #fff; }
+.avatar-user { background: var(--surface3); color: var(--text2); }
+.chat-bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 13.5px; line-height: 1.65; color: var(--text2); max-width: 600px; }
+.chat-msg.user .chat-bubble { background: var(--gold); border-color: var(--gold); color: #fff; }
+.chat-bubble p { margin-bottom: 8px; }
+.chat-bubble p:last-child { margin-bottom: 0; }
+.chat-timestamp { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.chat-msg.user .chat-timestamp { text-align: right; }
+.chat-typing { display: flex; gap: 4px; padding: 12px 16px; }
+.chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s ease-in-out infinite; }
+.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100% { transform:translateY(0);opacity:0.4; } 30% { transform:translateY(-6px);opacity:1; } }
+.chat-footer { padding: 16px 0 20px; border-top: 1px solid var(--border); }
+.chat-suggestions { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chat-suggestion { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border2); background: var(--surface); color: var(--text2); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.chat-suggestion:hover { border-color: var(--gold); color: var(--gold); }
+.chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+.chat-input { flex: 1; background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 12px 16px; outline: none; resize: none; min-height: 48px; max-height: 140px; transition: border-color 0.15s; line-height: 1.5; }
+.chat-input:focus { border-color: var(--gold); }
+.chat-input::placeholder { color: var(--text3); }
+.chat-send { width: 44px; height: 44px; background: var(--gold); border: none; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; color: #fff; }
+.chat-send:hover { background: var(--gold2); }
+.chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* SECTION TITLE */
+.section-title { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--text); margin-bottom: 16px; }
+
+/* PERIOD BAR */
+.period-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; padding: 14px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.period-label { font-size: 12px; color: var(--text3); }
+.period-value { font-size: 13px; font-weight: 500; color: var(--gold); }
+
+/* TOAST */
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface3); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 12px 18px; font-size: 13px; color: var(--text); z-index: 999; transform: translateY(20px); opacity: 0; transition: all 0.3s; max-width: 320px; }
+#toast.show { transform: translateY(0); opacity: 1; }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 60px 24px; color: var(--text3); }
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 16px; }
+.empty-state h3 { font-size: 16px; color: var(--text2); margin-bottom: 8px; }
+
+/* NF READER */
+.nf-upload-area { border: 2px dashed var(--border2); border-radius: var(--radius); padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; background: var(--surface2); }
+.nf-upload-area:hover, .nf-upload-area.dragover { border-color: var(--gold); background: rgba(138,95,40,0.05); }
+.nf-upload-icon { font-size: 32px; margin-bottom: 8px; }
+.nf-upload-text { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+.nf-upload-sub { font-size: 11px; color: var(--text3); }
+.nf-preview { width: 100%; max-height: 200px; object-fit: contain; border-radius: var(--radius-sm); margin-bottom: 12px; border: 1px solid var(--border); }
+.nf-items-list { background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px; }
+.nf-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.nf-item:last-child { border-bottom: none; }
+.nf-item-check { width: 16px; height: 16px; cursor: pointer; accent-color: var(--gold); flex-shrink: 0; }
+.nf-item-desc { flex: 1; color: var(--text2); }
+.nf-item-val { font-weight: 500; color: var(--text); white-space: nowrap; }
+.nf-item-cat { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: rgba(138,95,40,0.1); color: var(--gold); white-space: nowrap; }
+.nf-reading { display: flex; align-items: center; gap: 10px; padding: 20px; color: var(--text3); font-size: 13px; font-style: italic; justify-content: center; }
+.nf-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.nf-tab { padding: 7px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--border2); background: transparent; color: var(--text2); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.nf-tab.active { background: var(--gold); color: #fff; border-color: var(--gold); }
+
+/* ===== EMPRESA CHAT ===== */
+.ec-wrap { display: flex; height: calc(100vh - 65px); overflow: hidden; }
+.ec-sidebar { width: 260px; min-width: 260px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); }
+.ec-header { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.ec-name { font-family: 'DM Serif Display', serif; font-size: 15px; }
+.ec-type { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.ec-stats { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.ec-stat-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+.ec-stat-row:last-child { border-bottom: none; }
+.ec-stat-label { color: var(--text3); }
+.ec-stat-value { font-weight: 600; }
+.session-log { flex: 1; overflow-y: auto; padding: 12px 14px; }
+.session-log-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 8px; }
+.log-item { padding: 7px 10px; border-radius: var(--radius-sm); margin-bottom: 5px; font-size: 12px; border: 1px solid var(--border); background: var(--surface2); }
+.log-item.success { border-color: rgba(30,122,74,.3); background: rgba(30,122,74,.04); }
+.log-item.error { border-color: rgba(184,50,50,.3); background: rgba(184,50,50,.04); }
+.log-item-desc { color: var(--text2); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log-item-meta { display: flex; justify-content: space-between; align-items: center; gap: 4px; color: var(--text3); font-size: 10px; }
+.log-item-val { font-weight: 600; color: var(--text); }
+.log-item.success .log-item-status { color: var(--green); }
+.log-item.error .log-item-status { color: var(--red); }
+.log-footer { padding: 10px 14px; border-top: 1px solid var(--border); }
+.log-summary { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+.ec-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.ec-topbar { padding: 11px 20px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 10px; }
+.ec-topbar-name { font-weight: 600; font-size: 14px; }
+.ec-topbar-sub { font-size: 12px; color: var(--text3); margin-left: auto; }
+.ec-messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.emp-msg { display: flex; gap: 10px; align-items: flex-start; max-width: 90%; }
+.emp-msg.user { flex-direction: row-reverse; align-self: flex-end; }
+.emp-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.emp-avatar.ai { background: var(--gold); color: #fff; }
+.emp-avatar.user { background: var(--surface3); color: var(--text2); }
+.emp-bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.6; color: var(--text2); }
+.emp-msg.user .emp-bubble { background: var(--gold); border-color: var(--gold); color: #fff; }
+.emp-bubble p { margin-bottom: 5px; } .emp-bubble p:last-child { margin-bottom: 0; }
+.emp-time { font-size: 10px; color: var(--text3); margin-top: 3px; }
+.emp-msg.user .emp-time { text-align: right; }
+.confirm-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; min-width: 300px; max-width: 480px; }
+.confirm-header { padding: 10px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; }
+.confirm-item { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.confirm-item:last-child { border-bottom: none; }
+.confirm-item-check { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
+.confirm-item-desc { flex: 1; color: var(--text2); font-size: 12px; }
+.confirm-item-cat { font-size: 10px; padding: 2px 6px; border-radius: 8px; background: rgba(138,95,40,.1); color: var(--gold); white-space: nowrap; flex-shrink: 0; }
+.confirm-item-val { font-weight: 600; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+.confirm-item-edit { display: none; flex-direction: column; gap: 6px; padding: 8px 14px 10px; border-bottom: 1px solid var(--border); background: rgba(138,95,40,.04); }
+.confirm-item-edit.open { display: flex; }
+.confirm-item-edit input, .confirm-item-edit select { background: var(--surface); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 8px; outline: none; width: 100%; }
+.confirm-item-edit input:focus, .confirm-item-edit select:focus { border-color: var(--gold); }
+.confirm-item-edit-row { display: flex; gap: 6px; align-items: center; }
+.confirm-item-edit-label { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+.confirm-item-edit-btn { font-size:11px; color:var(--text3); cursor:pointer; padding:2px 4px; background:none; border:none; margin-left:auto; }
+.confirm-item-edit-btn:hover { color:var(--gold); }
+.confirm-edit { display: flex; gap: 6px; padding: 10px 14px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); background: var(--surface2); }
+.confirm-edit input, .confirm-edit select { background: var(--surface); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 8px; outline: none; }
+.confirm-edit input:focus, .confirm-edit select:focus { border-color: var(--gold); }
+.confirm-actions { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.drive-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; border-radius: 10px; background: rgba(45,95,160,.1); color: var(--blue); margin-top: 4px; cursor: pointer; text-decoration: none; }
+.ec-footer { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface); }
+.ec-actions-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.ec-action-btn { padding: 5px 10px; border-radius: 16px; font-size: 11px; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text2); font-family: 'DM Sans', sans-serif; transition: all .15s; }
+.ec-action-btn:hover { border-color: var(--gold); color: var(--gold); }
+.nf-fila-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-width: 280px; max-width: 420px; }
+.nf-fila-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.nf-fila-item:last-child { border-bottom: none; }
+.nota-preview-wrap { margin: 0 0 4px; border-bottom: 1px dashed var(--border); }
+.nota-preview-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: rgba(45,95,160,.05); font-size: 11px; color: var(--text3); }
+.nota-preview-toggle { font-size: 11px; color: var(--blue); cursor: pointer; background: rgba(45,95,160,.08); border: 1px solid rgba(45,95,160,.2); border-radius: 10px; padding: 3px 10px; font-family: 'DM Sans', sans-serif; }
+.nota-preview-toggle:hover { background: rgba(45,95,160,.15); }
+.nota-preview-img-wrap { overflow: hidden; display: none; background: var(--surface2); text-align: center; padding: 8px; }
+.nota-preview-img-wrap.open { display: block; }
+.nota-preview-img { max-width: 100%; max-height: 420px; object-fit: contain; border-radius: 4px; cursor: zoom-in; border: 1px solid var(--border); }
+.nota-preview-img.zoomed { max-height: none; cursor: zoom-out; }
+.nota-preview-pdf { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 20px; color: var(--text2); font-size: 13px; }
+.nota-preview-pdf a { color: var(--gold); text-decoration: none; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-title">Agência Contábil</div>
+    <div class="logo-sub">Matheus Saldanha Garcia</div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Menu</div>
+    <div class="nav-item active" onclick="showPage('portfolio')"><span class="nav-icon">◈</span> Portfólio</div>
+    <div class="nav-item" onclick="showPage('dre')"><span class="nav-icon">≡</span> DRE por Empresa</div>
+    <div class="nav-item" onclick="showPage('lancamentos')"><span class="nav-icon">⊕</span> Lançamentos</div>
+    <div class="nav-item" onclick="showPage('chat')"><span class="nav-icon">✦</span> Assistente IA</div>
+    <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙</span> Configurações</div>
+  </div>
+  <div class="sidebar-companies">
+    <div class="sidebar-section-label" style="padding:0 8px;margin-bottom:8px;">Lançar por Empresa</div>
+    <div class="company-item" id="ci-0" onclick="abrirEmpresaChat('containers')">
+      <div class="company-dot" style="background:#e05252"></div>
+      <div><div class="company-name">Containers Hamburgueria</div><div class="company-revenue" id="rev-0">—</div></div>
+    </div>
+    <div class="company-item" id="ci-1" onclick="abrirEmpresaChat('dimatteo')">
+      <div class="company-dot" style="background:#5b8fd4"></div>
+      <div><div class="company-name">DiMatteo Açaí</div><div class="company-revenue" id="rev-1">—</div></div>
+    </div>
+    <div class="company-item" id="ci-2" onclick="abrirEmpresaChat('pizzaria')">
+      <div class="company-dot" style="background:#c9a96e"></div>
+      <div><div class="company-name">SM Pizzaria</div><div class="company-revenue" id="rev-2">—</div></div>
+    </div>
+    <div class="company-item" id="ci-3" onclick="abrirEmpresaChat('restaurante')">
+      <div class="company-dot" style="background:#4caf7d"></div>
+      <div><div class="company-name">SM Restaurante</div><div class="company-revenue" id="rev-3">—</div></div>
+    </div>
+    <div class="company-item" id="ci-4" onclick="abrirEmpresaChat('riopreto')">
+      <div class="company-dot" style="background:#a78bfa"></div>
+      <div><div class="company-name">SM Rio Preto</div><div class="company-revenue" id="rev-4">—</div></div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="api-status">
+      <div class="api-dot" id="apiDot"></div>
+      <span id="apiStatusText">Verificando API...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbarTitle">Portfólio</div>
+      <div class="topbar-sub" id="topbarSub">Visão consolidada</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openModal('modalLancamento')">+ Novo lançamento</button>
+      <button class="btn btn-primary btn-sm" onclick="gerarAnalise()">✦ Análise IA</button>
+    </div>
+  </div>
+
+  <!-- PAGE: PORTFOLIO -->
+  <div class="page active" id="page-portfolio">
+    <div class="period-bar">
+      <span class="period-label">Período:</span>
+      <span class="period-value" id="periodoAtual">Carregando...</span>
+      <span style="color:var(--text3);font-size:12px;">|</span>
+      <span class="period-label">Status:</span>
+      <span style="font-size:13px;color:var(--yellow);font-weight:500;">Mês em andamento</span>
+    </div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="stat-label">Faturamento Total</div><div class="stat-value" id="statFaturamento">—</div><div class="stat-sub">5 operações</div></div>
+      <div class="stat-card"><div class="stat-label">Melhor Margem</div><div class="stat-value val-positive" id="statMelhorMargem">—</div><div class="stat-sub" id="statMelhorMargemEmp">—</div></div>
+      <div class="stat-card"><div class="stat-label">Maior CMV</div><div class="stat-value val-negative" id="statMaiorCMV">—</div><div class="stat-sub" id="statMaiorCMVEmp">—</div></div>
+      <div class="stat-card"><div class="stat-label">Lançamentos</div><div class="stat-value" id="statLancamentos">—</div><div class="stat-sub">itens registrados</div></div>
+    </div>
+    <div class="companies-grid" id="companiesGrid">
+      <div class="loading-overlay"><div class="spinner"></div> Carregando dados...</div>
+    </div>
+  </div>
+
+  <!-- PAGE: DRE -->
+  <div class="page" id="page-dre">
+    <div class="dre-selector" id="dreSelector">
+      <button class="dre-tab active" onclick="selectDRETab('containers',this)">Containers</button>
+      <button class="dre-tab" onclick="selectDRETab('dimatteo',this)">DiMatteo</button>
+      <button class="dre-tab" onclick="selectDRETab('pizzaria',this)">SM Pizzaria</button>
+      <button class="dre-tab" onclick="selectDRETab('restaurante',this)">SM Restaurante</button>
+      <button class="dre-tab" onclick="selectDRETab('riopreto',this)">SM Rio Preto</button>
+    </div>
+    <div class="dre-container">
+      <div class="dre-table-wrap">
+        <div class="dre-table-title">
+          <h3 id="dreTitleEmp">DRE — Empresa</h3>
+          <p id="dreTitlePeriodo">Março / 2026</p>
+        </div>
+        <div id="dreTableContent"><div class="loading-overlay"><div class="spinner"></div> Carregando DRE...</div></div>
+      </div>
+      <div class="dre-sidebar">
+        <div class="metric-card">
+          <div class="metric-card-title">Indicadores-chave</div>
+          <div id="dreIndicadores"><div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: LANÇAMENTOS -->
+  <div class="page" id="page-lancamentos">
+    <div class="lancamentos-header">
+      <div class="lancamentos-filters">
+        <select class="filter-select" id="filterEmpresa" onchange="filtrarLancamentos()">
+          <option value="">Todas as empresas</option>
+          <option value="containers">Containers Hamburgueria</option>
+          <option value="dimatteo">DiMatteo Açaí</option>
+          <option value="pizzaria">SM Pizzaria</option>
+          <option value="restaurante">SM Restaurante</option>
+          <option value="riopreto">SM Rio Preto</option>
+        </select>
+        <select class="filter-select" id="filterCategoria" onchange="filtrarLancamentos()">
+          <option value="">Todas as categorias</option>
+          <option value="Receita Bruta">Receita Bruta</option>
+          <option value="CMV">CMV</option>
+          <option value="Pessoal">Pessoal</option>
+          <option value="Desp. Operacionais">Desp. Operacionais</option>
+          <option value="Despesas Fixas">Despesas Fixas</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modalLancamento')">+ Novo lançamento</button>
+    </div>
+    <div class="lancamentos-table-wrap">
+      <table class="lancamentos-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Empresa</th>
+            <th>Categoria</th>
+            <th>Descrição</th>
+            <th>Fornecedor</th>
+            <th style="text-align:right">Valor</th>
+          </tr>
+        </thead>
+        <tbody id="lancamentosBody">
+          <tr><td colspan="6"><div class="loading-overlay"><div class="spinner"></div> Carregando lançamentos...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE: CHAT -->
+  <div class="page" id="page-chat">
+    <div class="chat-wrap">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-footer">
+        <div class="chat-suggestions" id="chatSuggestions">
+          <button class="chat-suggestion" onclick="sendSuggestion(this)">📊 Análise geral do portfólio</button>
+          <button class="chat-suggestion" onclick="sendSuggestion(this)">⚠️ Quais empresas estão com CMV alto?</button>
+          <button class="chat-suggestion" onclick="sendSuggestion(this)">💡 Relatório executivo março</button>
+        </div>
+        <div class="chat-input-row">
+          <textarea class="chat-input" id="chatInput" placeholder="Fale com seu assistente financeiro..." rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          <button class="chat-send" id="chatSendBtn" onclick="sendChat()">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: SETTINGS -->
+  <div class="page" id="page-settings">
+    <div class="settings-grid">
+      <div class="settings-card">
+        <div class="settings-card-title">API Google Sheets</div>
+        <div class="alert alert-ok" id="sheetsApiStatus">✓ API conectada e funcionando</div>
+        <div class="form-group">
+          <label class="form-label">URL da Web API (Apps Script)</label>
+          <div class="api-key-wrap">
+            <input type="text" class="form-input" id="sheetsApiUrl" placeholder="https://script.google.com/macros/s/...">
+            <button class="btn btn-primary btn-sm" onclick="salvarApiUrl()">Salvar</button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-card-title">Chave API Anthropic</div>
+        <div class="form-group">
+          <label class="form-label">Chave de API (Assistente IA)</label>
+          <div class="api-key-wrap">
+            <input type="password" class="form-input" id="anthropicKey" placeholder="sk-ant-...">
+            <button class="btn btn-primary btn-sm" onclick="salvarAnthropicKey()">Salvar</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);margin-top:12px;">Necessária para usar o Assistente IA. Salva localmente no seu navegador.</p>
+      </div>
+      <div class="settings-card" style="grid-column:1/-1">
+        <div class="settings-card-title">Empresas Cadastradas</div>
+        <table class="lancamentos-table">
+          <thead><tr><th>Empresa</th><th>Chave</th><th>ID Google Sheets</th></tr></thead>
+          <tbody>
+            <tr><td>Containers Hamburgueria</td><td>containers</td><td style="font-size:11px;color:var(--text3)">1PEZ_M3dFc4AVc9f4zHXlY1xKj360zbtXUZqOHPcaeiM</td></tr>
+            <tr><td>DiMatteo Açaí</td><td>dimatteo</td><td style="font-size:11px;color:var(--text3)">14DklR1iIdIdUE5HpheixbBBRUNvyPKsSHPX7BRKVANw</td></tr>
+            <tr><td>Santa Massa Pizzaria</td><td>pizzaria</td><td style="font-size:11px;color:var(--text3)">14qDlPqYgi0mf7e1-iyE399NKVUun9oG_-mVDYfq5RVk</td></tr>
+            <tr><td>Santa Massa Restaurante</td><td>restaurante</td><td style="font-size:11px;color:var(--text3)">1mC1l6-BB1oHdSoAOFfH2XI9s02KrOUOfoyb6bzakMIs</td></tr>
+            <tr><td>Santa Massa Rio Preto</td><td>riopreto</td><td style="font-size:11px;color:var(--text3)">1ybDbTOIjDNaYWjct-fFFouEPdV2FLdvRIMk04bhrfA8</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- EMPRESA CHAT -->
+  <div class="page" id="page-empresa-chat" style="padding:0">
+    <div class="ec-wrap">
+      <div class="ec-sidebar">
+        <div class="ec-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="company-dot" id="ecDot" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+            <div><div class="ec-name" id="ecName">Empresa</div><div class="ec-type" id="ecType">—</div></div>
+          </div>
+        </div>
+        <div class="ec-stats" id="ecStats"></div>
+        <div class="session-log">
+          <div class="session-log-title">Log da sessão</div>
+          <div id="sessionLog"><div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">Nenhum lançamento ainda.</div></div>
+        </div>
+        <div class="log-footer">
+          <div class="log-summary" id="logSummary">Sessão iniciada</div>
+          <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:6px" onclick="exportarLog()">⬇ Exportar log CSV</button>
+          <a id="driveFolderLink" href="#" target="_blank" class="drive-badge" style="display:none">📁 Pasta no Drive</a>
+        </div>
+      </div>
+      <div class="ec-main">
+        <div class="ec-topbar">
+          <div class="company-dot" id="ecDot2" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+          <span class="ec-topbar-name" id="ecName2">Empresa</span>
+          <span class="ec-topbar-sub" id="ecDate"></span>
+        </div>
+        <div class="ec-messages" id="ecMessages"></div>
+        <div class="ec-footer">
+          <div class="ec-actions-row">
+            <button class="ec-action-btn" onclick="sugerirAcao('faturamento')">💰 Faturamento</button>
+            <button class="ec-action-btn" onclick="document.getElementById('ecNFInput').click()">📄 Nota Fiscal</button>
+            <button class="ec-action-btn" onclick="sugerirAcao('despesa')">📝 Despesa</button>
+            <button class="ec-action-btn" onclick="sugerirAcao('relatorio')">📊 Relatório</button>
+          </div>
+          <input type="file" id="ecNFInput" accept="image/*,application/pdf" multiple style="display:none" onchange="processarNFEmpresa(this.files)">
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="ecInput" placeholder="Digite ou descreva o lançamento..."
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMsgEmpresa()}"
+              oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+            <button class="chat-send" id="ecSendBtn" onclick="enviarMsgEmpresa()">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODAL: NOVO LANÇAMENTO -->
+<div class="modal-overlay" id="modalLancamento">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Novo Lançamento</div>
+      <button class="modal-close" onclick="closeModal('modalLancamento')">×</button>
+    </div>
+    <div class="modal-body">
+
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Empresa</label>
+          <select class="form-select" id="lancEmpresa">
+            <option value="containers">Containers Hamburgueria</option>
+            <option value="dimatteo">DiMatteo Açaí</option>
+            <option value="pizzaria">SM Pizzaria</option>
+            <option value="restaurante">SM Restaurante</option>
+            <option value="riopreto">SM Rio Preto</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-input" id="lancData">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <select class="form-select" id="lancCategoria">
+            <option value="Receita Bruta">Receita Bruta</option>
+            <option value="CMV">CMV</option>
+            <option value="Pessoal">Pessoal</option>
+            <option value="Desp. Operacionais">Desp. Operacionais</option>
+            <option value="Despesas Fixas">Despesas Fixas</option>
+          </select>
+        </div>
+        <div class="form-group span2">
+          <label class="form-label">Descrição</label>
+          <input type="text" class="form-input" id="lancDescricao" placeholder="Ex: Compra de insumos — Fornecedor XYZ">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor (R$)</label>
+          <input type="number" class="form-input" id="lancValor" placeholder="0,00" step="0.01">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Fornecedor (opcional)</label>
+          <input type="text" class="form-input" id="lancFornecedor" placeholder="Nome do fornecedor">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalLancamento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarLancamento()">Salvar lançamento</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO
+// ============================================================
+const API_URL_KEY = 'agencia_api_url';
+const ANTHROPIC_KEY_STORAGE = 'agencia_anthropic_key';
+
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbww1db3RzmQTzwfdGm8BRLJ9SlWGnhYj3K0aKFmBdOrGJd7tL6DXQJWFgJgjnkd5y-j/exec';
+
+const COMPANIES_META = {
+  containers: { name: 'Containers Hamburgueria', tipo: 'Hamburgueria · Jales/SP', cor: '#e05252', idx: 0 },
+  dimatteo:   { name: 'DiMatteo Açaí',           tipo: 'Açaí · Mirassol/SP',      cor: '#5b8fd4', idx: 1 },
+  pizzaria:   { name: 'Santa Massa Pizzaria',     tipo: 'Pizzaria · Mirassol/SP',  cor: '#c9a96e', idx: 2 },
+  restaurante:{ name: 'Santa Massa Restaurante',  tipo: 'Restaurante · Mirassol/SP', cor: '#4caf7d', idx: 3 },
+  riopreto:   { name: 'Santa Massa Rio Preto',    tipo: 'Restaurante · Rio Preto/SP', cor: '#a78bfa', idx: 4 },
+};
+
+let apiUrl = localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
+let apiKey = localStorage.getItem(ANTHROPIC_KEY_STORAGE) || '';
+let consolidadoCache = null;
+let lancamentosCache = {};
+let currentDREEmpresa = 'containers';
+let chatHistory = [];
+let chatTyping = false;
+let chatInitialized = false;
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Set today's date on form
+  document.getElementById('lancData').value = new Date().toISOString().split('T')[0];
+
+  // Load saved settings
+  if (localStorage.getItem(API_URL_KEY)) {
+    document.getElementById('sheetsApiUrl').value = apiUrl;
+  }
+  if (apiKey) {
+    document.getElementById('anthropicKey').value = apiKey;
+  }
+
+  const mes = new Date().toLocaleString('pt-BR', {month:'long', year:'numeric'});
+  document.getElementById('periodoAtual').textContent = mes.charAt(0).toUpperCase() + mes.slice(1);
+
+  pingAPI();
+  loadConsolidado();
+});
+
+// ============================================================
+// API CALLS
+// ============================================================
+async function callAPI(params) {
+  const url = new URL(apiUrl);
+  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+  const res = await fetch(url.toString());
+  return await res.json();
+}
+
+async function postAPI(body) {
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
+async function pingAPI() {
+  try {
+    const r = await callAPI({ action: 'ping' });
+    if (r.status === 'ok') {
+      document.getElementById('apiDot').classList.add('on');
+      document.getElementById('apiStatusText').textContent = 'API conectada';
+      document.getElementById('sheetsApiStatus').textContent = '✓ API conectada e funcionando';
+      document.getElementById('sheetsApiStatus').className = 'alert alert-ok';
+    } else {
+      throw new Error('status error');
+    }
+  } catch(e) {
+    document.getElementById('apiStatusText').textContent = 'API offline';
+    document.getElementById('sheetsApiStatus').textContent = '✗ API não acessível. Verifique a URL.';
+    document.getElementById('sheetsApiStatus').className = 'alert alert-warn';
+  }
+}
+
+async function loadConsolidado() {
+  try {
+    const r = await callAPI({ action: 'getConsolidado' });
+    if (r.status === 'ok') {
+      consolidadoCache = r.data;
+      renderPortfolio();
+      updateSidebarRevenues();
+    }
+  } catch(e) {
+    document.getElementById('companiesGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠</div><h3>Erro ao carregar dados</h3><p>Verifique a URL da API em Configurações.</p></div>';
+  }
+}
+
+async function loadLancamentos(empresa) {
+  if (lancamentosCache[empresa]) return lancamentosCache[empresa];
+  try {
+    const r = await callAPI({ action: 'getLancamentos', empresa });
+    if (r.status === 'ok') {
+      lancamentosCache[empresa] = r.data;
+      return r.data;
+    }
+  } catch(e) {}
+  return [];
+}
+
+// ============================================================
+// PORTFOLIO RENDER
+// ============================================================
+function renderPortfolio() {
+  const data = consolidadoCache;
+  if (!data) return;
+
+  // Calc totals
+  let totalReceita = 0, totalLanc = 0;
+  let melhorMargem = -Infinity, melhorMargemEmp = '';
+  let maiorCMV = 0, maiorCMVEmp = '';
+
+  const empresaData = {};
+  for (const key in COMPANIES_META) {
+    const rows = data[key] || [];
+    const mesAtual = new Date().getMonth() + 1;
+    const anoAtual = new Date().getFullYear();
+    const row = rows.find(r => Number(r['Mês']) === mesAtual && Number(r['Ano']) === anoAtual) || rows[rows.length - 1] || null;
+    empresaData[key] = row;
+
+    if (row) {
+      const receita = parseFloat(row['Receita Bruta']) || 0;
+      const cmvPct = parseFloat(row['% CMV']) || 0;
+      const margem = parseFloat(row['% Margem EBITDA']) || 0;
+      totalReceita += receita;
+      if (margem > melhorMargem) { melhorMargem = margem; melhorMargemEmp = COMPANIES_META[key].name; }
+      if (cmvPct > maiorCMV) { maiorCMV = cmvPct; maiorCMVEmp = COMPANIES_META[key].name; }
+    }
+  }
+
+  // Stats
+  document.getElementById('statFaturamento').textContent = formatCurrency(totalReceita);
+  document.getElementById('statMelhorMargem').textContent = melhorMargem > -Infinity ? melhorMargem.toFixed(1) + '%' : '—';
+  document.getElementById('statMelhorMargemEmp').textContent = melhorMargemEmp;
+  document.getElementById('statMaiorCMV').textContent = maiorCMV > 0 ? maiorCMV.toFixed(1) + '%' : '—';
+  document.getElementById('statMaiorCMVEmp').textContent = maiorCMVEmp;
+  document.getElementById('statLancamentos').textContent = '—';
+
+  // Cards
+  let html = '';
+  for (const key in COMPANIES_META) {
+    const meta = COMPANIES_META[key];
+    const row = empresaData[key];
+    const receita = row ? parseFloat(row['Receita Bruta']) || 0 : 0;
+    const cmvPct = row ? parseFloat(row['% CMV']) || 0 : 0;
+    const margem = row ? parseFloat(row['% Margem EBITDA']) || 0 : 0;
+    const ebitda = row ? parseFloat(row['EBITDA']) || 0 : 0;
+
+    const health = cmvPct > 50 ? 'red' : cmvPct > 40 ? 'yellow' : 'green';
+    const healthLabel = health === 'green' ? 'SAUDÁVEL' : health === 'yellow' ? 'ATENÇÃO' : 'CRÍTICO';
+    const cmvClass = cmvPct > 50 ? 'bad' : cmvPct > 40 ? 'warn' : 'good';
+    const cmvFill = cmvPct > 50 ? 'fill-red' : cmvPct > 40 ? 'fill-yellow' : 'fill-green';
+
+    html += `
+    <div class="company-card" onclick="goToDRE('${key}')">
+      <div class="company-card-header">
+        <div>
+          <div class="company-card-name">${meta.name}</div>
+          <div class="company-card-type">${meta.tipo}</div>
+        </div>
+        <div class="health-badge health-${health}">${healthLabel}</div>
+      </div>
+      <div class="company-card-body">
+        <div class="cc-metrics">
+          <div><div class="cc-metric-label">Faturamento</div><div class="cc-metric-value">${row ? formatCurrency(receita) : '—'}</div></div>
+          <div><div class="cc-metric-label">CMV %</div><div class="cc-metric-value ${cmvClass}">${row ? cmvPct.toFixed(1) + '%' : '—'}</div></div>
+          <div><div class="cc-metric-label">EBITDA</div><div class="cc-metric-value ${ebitda >= 0 ? 'good' : 'bad'}">${row ? formatCurrency(ebitda) : '—'}</div></div>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-label"><span>CMV sobre receita</span><span>${cmvPct.toFixed(1)}%</span></div>
+          <div class="progress-bar"><div class="progress-fill ${cmvFill}" style="width:${Math.min(cmvPct,100)}%"></div></div>
+        </div>
+      </div>
+      <div class="company-card-footer">
+        <span class="cc-footer-note">${row ? 'Dados do período atual' : 'Sem dados no período'}</span>
+        <span class="cc-footer-link" onclick="event.stopPropagation();goToDRE('${key}')">Ver DRE →</span>
+      </div>
+    </div>`;
+  }
+  document.getElementById('companiesGrid').innerHTML = html;
+}
+
+function updateSidebarRevenues() {
+  if (!consolidadoCache) return;
+  const keys = Object.keys(COMPANIES_META);
+  keys.forEach((key, i) => {
+    const rows = consolidadoCache[key] || [];
+    const row = rows[rows.length - 1];
+    const el = document.getElementById('rev-' + i);
+    if (el && row) el.textContent = formatCurrency(parseFloat(row['Receita Bruta']) || 0);
+  });
+}
+
+// ============================================================
+// DRE RENDER
+// ============================================================
+function goToDRE(empresaKey) {
+  currentDREEmpresa = empresaKey;
+  showPage('dre');
+  // Activate correct tab
+  document.querySelectorAll('.dre-tab').forEach((t,i) => {
+    const keys = Object.keys(COMPANIES_META);
+    t.classList.toggle('active', keys[i] === empresaKey);
+  });
+  renderDRE(empresaKey);
+}
+
+function selectDRETab(empresaKey, btn) {
+  document.querySelectorAll('.dre-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentDREEmpresa = empresaKey;
+  renderDRE(empresaKey);
+}
+
+function renderDRE(empresaKey) {
+  const meta = COMPANIES_META[empresaKey];
+  document.getElementById('dreTitleEmp').textContent = 'DRE — ' + meta.name;
+
+  if (!consolidadoCache || !consolidadoCache[empresaKey]) {
+    document.getElementById('dreTableContent').innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Carregando...</div>';
+    return;
+  }
+
+  const rows = consolidadoCache[empresaKey];
+  const row = rows[rows.length - 1];
+
+  if (!row) {
+    document.getElementById('dreTableContent').innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><h3>Sem dados cadastrados</h3><p>Adicione lançamentos para gerar a DRE.</p></div>';
+    document.getElementById('dreIndicadores').innerHTML = '<p style="color:var(--text3);font-size:13px;padding:8px 0">Sem dados</p>';
+    return;
+  }
+
+  const receita = parseFloat(row['Receita Bruta']) || 0;
+  const cmv = parseFloat(row['CMV']) || 0;
+  const lucroBruto = parseFloat(row['Lucro Bruto']) || receita - cmv;
+  const cmvPct = parseFloat(row['% CMV']) || 0;
+  const pessoal = parseFloat(row['Pessoal']) || 0;
+  const operacional = parseFloat(row['Desp. Operacionais']) || 0;
+  const fixas = parseFloat(row['Despesas Fixas']) || 0;
+  const totalDesp = parseFloat(row['Total Despesas']) || pessoal + operacional + fixas;
+  const ebitda = parseFloat(row['EBITDA']) || lucroBruto - totalDesp;
+  const margem = parseFloat(row['% Margem EBITDA']) || 0;
+
+  const periodo = row['Mês'] && row['Ano'] ? `${nomeMes(row['Mês'])} / ${row['Ano']}` : 'Período atual';
+  document.getElementById('dreTitlePeriodo').textContent = periodo;
+
+  document.getElementById('dreTableContent').innerHTML = `
+  <table class="dre-table">
+    <tr class="section-header"><td colspan="2">Receita</td></tr>
+    <tr class="item"><td>Receita Bruta</td><td class="val-positive">${formatCurrency(receita)}</td></tr>
+    <tr class="total"><td>Total Receita</td><td class="val-positive">${formatCurrency(receita)}</td></tr>
+
+    <tr class="section-header"><td colspan="2">Custos</td></tr>
+    <tr class="item"><td>CMV (Custo da Mercadoria Vendida)</td><td class="val-negative">(${formatCurrency(cmv)})</td></tr>
+    <tr class="total"><td>Lucro Bruto</td><td class="${lucroBruto >= 0 ? 'val-positive' : 'val-negative'}">${formatCurrency(lucroBruto)}</td></tr>
+
+    <tr class="section-header"><td colspan="2">Despesas Operacionais</td></tr>
+    <tr class="item"><td>Pessoal</td><td class="val-negative">(${formatCurrency(pessoal)})</td></tr>
+    <tr class="item"><td>Despesas Operacionais</td><td class="val-negative">(${formatCurrency(operacional)})</td></tr>
+    <tr class="item"><td>Despesas Fixas</td><td class="val-negative">(${formatCurrency(fixas)})</td></tr>
+    <tr class="total"><td>Total Despesas</td><td class="val-negative">(${formatCurrency(totalDesp)})</td></tr>
+
+    <tr class="grand-total">
+      <td>EBITDA</td>
+      <td class="${ebitda >= 0 ? 'val-positive' : 'val-negative'}">${formatCurrency(ebitda)}</td>
+    </tr>
+  </table>`;
+
+  document.getElementById('dreIndicadores').innerHTML = `
+    <div class="metric-item"><span class="metric-item-label">CMV %</span><span class="metric-item-value ${cmvPct > 50 ? 'val-negative' : cmvPct > 40 ? '' : 'val-positive'}">${cmvPct.toFixed(1)}%</span></div>
+    <div class="metric-item"><span class="metric-item-label">Margem EBITDA</span><span class="metric-item-value ${margem >= 15 ? 'val-positive' : margem >= 0 ? '' : 'val-negative'}">${margem.toFixed(1)}%</span></div>
+    <div class="metric-item"><span class="metric-item-label">Receita Bruta</span><span class="metric-item-value">${formatCurrency(receita)}</span></div>
+    <div class="metric-item"><span class="metric-item-label">EBITDA</span><span class="metric-item-value ${ebitda >= 0 ? 'val-positive' : 'val-negative'}">${formatCurrency(ebitda)}</span></div>
+    <div class="metric-item"><span class="metric-item-label">Total Despesas</span><span class="metric-item-value val-negative">${formatCurrency(totalDesp)}</span></div>`;
+}
+
+// ============================================================
+// LANÇAMENTOS
+// ============================================================
+async function renderLancamentos() {
+  const empFilter = document.getElementById('filterEmpresa').value;
+  const catFilter = document.getElementById('filterCategoria').value;
+  const tbody = document.getElementById('lancamentosBody');
+  tbody.innerHTML = '<tr><td colspan="6"><div class="loading-overlay"><div class="spinner"></div> Carregando...</div></td></tr>';
+
+  const empresas = empFilter ? [empFilter] : Object.keys(COMPANIES_META);
+  let all = [];
+  for (const emp of empresas) {
+    const rows = await loadLancamentos(emp);
+    rows.forEach(r => all.push({ ...r, _empresa: emp }));
+  }
+
+  if (catFilter) all = all.filter(r => r['Categoria'] === catFilter);
+  all.sort((a, b) => new Date(b['Data']) - new Date(a['Data']));
+
+  if (all.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><h3>Nenhum lançamento encontrado</h3></div></td></tr>';
+    return;
+  }
+
+  document.getElementById('statLancamentos').textContent = all.length;
+
+  tbody.innerHTML = all.slice(0, 100).map(r => {
+    const cat = r['Categoria'] || '';
+    const catClass = cat.includes('Receita') ? 'cat-receita' : cat === 'CMV' ? 'cat-cmv' : cat === 'Pessoal' ? 'cat-pessoal' : 'cat-desp';
+    const valor = parseFloat(r['Valor (R$)']) || 0;
+    const valClass = cat.includes('Receita') ? 'val-positive' : 'val-negative';
+    return `<tr>
+      <td>${formatDate(r['Data'])}</td>
+      <td>${COMPANIES_META[r._empresa]?.name || r._empresa}</td>
+      <td><span class="cat-pill ${catClass}">${cat}</span></td>
+      <td>${r['Descrição'] || '—'}</td>
+      <td>${r['Fornecedor'] || '—'}</td>
+      <td style="text-align:right" class="${valClass}">${formatCurrency(valor)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filtrarLancamentos() {
+  renderLancamentos();
+}
+
+// ============================================================
+// SALVAR LANÇAMENTO
+// ============================================================
+async function salvarLancamento() {
+  const empresa = document.getElementById('lancEmpresa').value;
+  const data = document.getElementById('lancData').value;
+  const categoria = document.getElementById('lancCategoria').value;
+  const descricao = document.getElementById('lancDescricao').value.trim();
+  const valor = parseFloat(document.getElementById('lancValor').value);
+  const fornecedor = document.getElementById('lancFornecedor').value.trim();
+
+  if (!descricao || !valor) { showToast('Preencha descrição e valor'); return; }
+
+  const [ano, mes] = data.split('-');
+  const dataFormatada = data.split('-').reverse().join('/');
+
+  try {
+    const r = await postAPI({
+      action: 'addLancamento',
+      empresa,
+      lancamento: { data: dataFormatada, categoria, descricao, valor, fornecedor, mes: parseInt(mes), ano: parseInt(ano) }
+    });
+    if (r.status === 'ok') {
+      closeModal('modalLancamento');
+      lancamentosCache[empresa] = null; // invalidate cache
+      showToast('✓ Lançamento salvo com sucesso!');
+      if (document.getElementById('page-lancamentos').classList.contains('active')) renderLancamentos();
+    } else {
+      showToast('Erro ao salvar: ' + r.message);
+    }
+  } catch(e) {
+    showToast('Erro de conexão');
+  }
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+let chatSystemPrompt = '';
+let lancamentosContexto = {};
+
+function buildSystemPrompt() {
+  // DRE consolidada
+  let dreContext = '';
+  if (consolidadoCache) {
+    for (const key in COMPANIES_META) {
+      const rows = consolidadoCache[key] || [];
+      const row = rows[rows.length - 1];
+      if (row) {
+        dreContext += `\n${COMPANIES_META[key].name}:
+  Receita Bruta: R$ ${Number(row['Receita Bruta']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+  CMV: R$ ${Number(row['CMV']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})} (${row['% CMV']||0}%)
+  Custo com Pessoal: R$ ${Number(row['Custo com Pessoal']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+  Despesas Operacionais: R$ ${Number(row['Despesas Operacionais']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+  Despesas Fixas: R$ ${Number(row['Despesas Fixas']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+  Total Despesas: R$ ${Number(row['Total Despesas']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})} (${row['% Total Despesas']||0}%)
+  EBITDA: R$ ${Number(row['EBITDA']||0).toLocaleString('pt-BR',{minimumFractionDigits:2})} (${row['% Margem EBITDA']||0}%)`;
+      }
+    }
+  }
+
+  // Lançamentos detalhados
+  let lancContext = '';
+  for (const key in lancamentosContexto) {
+    const lancs = lancamentosContexto[key] || [];
+    if (lancs.length === 0) continue;
+    lancContext += '\n\n' + COMPANIES_META[key].name + ' — ' + lancs.length + ' lançamentos:\n';
+    lancs.forEach(l => {
+      const valLanc = l['Valor (R$)'] || l['Valor'] || 0;
+      lancContext += '  [' + formatDate(l['Data']) + '] ' + l['Categoria'] + ' | ' + (l['Descrição']||'') + ' | ' + (l['Fornecedor']||'—') + ' | R$ ' + Number(valLanc).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '\n';
+    });
+  }
+
+  return `Você é o assistente financeiro pessoal de Matheus Saldanha Garcia, consultor de negócios e advogado (OAB/SP 411.209) que gerencia 5 operações food & beverage no interior de São Paulo.
+
+DADOS REAIS — MARÇO/2026 (parcial):
+${dreContext}
+
+LANÇAMENTOS DETALHADOS DO MÊS:
+${lancContext || 'Ainda carregando lançamentos...'}
+
+GLOSSÁRIO DE ABREVIAÇÕES (use ao buscar nos lançamentos):
+- "Calab" ou "Calabresa" = Linguiça Calabresa (ex: "Calab Aurora", "Calab Seara Fina", "Linguiça Tipo Calabresa")
+- "Muç" ou "Muçarela" = Queijo Muçarela
+- "Cerv" = Cerveja
+- "Batata" = Batata frita (ex: "Batata McCain")
+- "Filé" = Filé Mignon ou Filé de frango
+- "Farinha" = Farinha de trigo
+- "Ling" = Linguiça
+- "Tom" = Tomate ou Molho de Tomate
+- "Dist." = Distribuidor
+- "Emp." = Empório
+- "Cong" = Congelado
+- "Resf" = Resfriado
+- "Bov" = Bovino
+- "Suí" = Suíno
+- "CX" = Caixa
+- "KG" ou "KGS" = Quilograma
+- "UN" = Unidade
+- "PCT" = Pacote
+- "BD" = Balde
+- "LT" = Litro ou Lata
+
+INSTRUÇÕES DE BUSCA:
+- Ao buscar um ingrediente, procure por TODAS as variações do nome nos lançamentos de TODAS as empresas
+- Considere abreviações, nomes parciais e variações ortográficas
+- Some as quantidades quando houver múltiplas compras do mesmo produto
+- Sempre informe em qual empresa cada compra foi feita
+- Se o produto aparece com nome abreviado (ex: "Calab"), identifique e inclua na resposta
+
+SUAS FUNÇÕES:
+1. Responder perguntas sobre lançamentos específicos (fornecedores, produtos, quantidades, valores)
+2. Analisar CMV, margens e comparar empresas
+3. Alertar sobre CMV > 40% ou margem < 15%
+4. Gerar relatórios executivos
+5. Identificar padrões de compra e oportunidades de economia
+
+REGRAS:
+- Use os dados reais acima para responder — nunca invente valores
+- Seja direto e profissional
+- Use R$ formatado (ex: R$ 4.500,00)
+- Responda em português brasileiro
+- Não use markdown com ** ou *
+- Se não encontrar a informação nos dados, diga claramente`;
+}
+
+async function initChat() {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+  appendChatMsg('ai', `${greeting}, Matheus! Carregando dados do portfólio...`);
+
+  // Carrega lançamentos de todas as empresas em paralelo
+  const keys = Object.keys(COMPANIES_META);
+  const promises = keys.map(async key => {
+    try {
+      const r = await callAPI({ action: 'getLancamentos', empresa: key });
+      if (r.status === 'ok') lancamentosContexto[key] = r.data;
+    } catch(e) {}
+  });
+  await Promise.all(promises);
+
+  chatSystemPrompt = buildSystemPrompt();
+
+  // Atualiza mensagem de boas vindas
+  const msgs = document.getElementById('chatMessages');
+  if (msgs.lastElementChild) msgs.removeChild(msgs.lastElementChild);
+
+  const totalLancs = Object.values(lancamentosContexto).reduce((s, a) => s + (a||[]).length, 0);
+  appendChatMsg('ai', `${greeting}, Matheus! Portfólio carregado — ${totalLancs} lançamentos disponíveis para consulta.\n\nPosso responder sobre compras específicas, fornecedores, CMV, margens e gerar relatórios. Como posso ajudar?`);
+}
+
+function appendChatMsg(role, text) {
+  const msgs = document.getElementById('chatMessages');
+  const isUser = role === 'user';
+  const now = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + (isUser ? 'user' : 'ai');
+  const paras = text.split('\n\n').filter(Boolean).map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+  div.innerHTML = `
+    <div class="chat-avatar ${isUser ? 'avatar-user' : 'avatar-ai'}">${isUser ? 'M' : '✦'}</div>
+    <div><div class="chat-bubble">${paras || '<p>' + text + '</p>'}</div><div class="chat-timestamp">${now}</div></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendSuggestion(btn) {
+  document.getElementById('chatInput').value = btn.textContent.replace(/^[^\s]+\s/, '');
+  sendChat();
+}
+
+// Mapeamento de nomes para chaves de empresa
+const EMPRESA_ALIASES = {
+  'dimatteo': 'dimatteo', 'di matteo': 'dimatteo', 'açaí': 'dimatteo', 'acai': 'dimatteo',
+  'containers': 'containers', 'container': 'containers', 'hamburgueria': 'containers',
+  'pizzaria': 'pizzaria', 'pizza': 'pizzaria', 'sm pizzaria': 'pizzaria', 'santa massa pizzaria': 'pizzaria',
+  'restaurante': 'restaurante', 'sm restaurante': 'restaurante', 'santa massa restaurante': 'restaurante',
+  'rio preto': 'riopreto', 'riopreto': 'riopreto', 'sm rio preto': 'riopreto', 'santa massa rio preto': 'riopreto',
+};
+
+function detectarFaturamento(msg) {
+  // Detecta padrões como "faturamento", "fat", "vendas do dia", "receita de hoje"
+  const lower = msg.toLowerCase();
+  const isFaturamento = lower.includes('faturamento') || lower.includes('fat.') ||
+    lower.includes('vendas do dia') || lower.includes('vendas de hoje') ||
+    lower.includes('receita do dia') || lower.includes('receita de hoje') ||
+    (lower.includes('receita') && lower.includes('hoje'));
+  if (!isFaturamento) return null;
+
+  // Extrai pares empresa: valor usando regex
+  const resultados = [];
+  // Padrão: nome da empresa seguido de valor (ex: "DiMatteo 3200" ou "DiMatteo: R$3.200,00")
+  const regex = /(dimatteo|di matteo|aça[íi]|containers?|hamburgueria|pizzaria|pizza|restaurante|rio\s*preto|riopreto)[:\s]+(?:r\$\s*)?([\d.,]+)/gi;
+  let match;
+  while ((match = regex.exec(msg)) !== null) {
+    const aliasKey = match[1].toLowerCase().trim();
+    const empresaKey = EMPRESA_ALIASES[aliasKey];
+    if (!empresaKey) continue;
+    let valorStr = match[2].replace(/\./g, '').replace(',', '.');
+    const valor = parseFloat(valorStr);
+    if (valor > 0) resultados.push({ empresa: empresaKey, valor });
+  }
+  return resultados.length > 0 ? resultados : null;
+}
+
+// Estado de confirmação de faturamento pendente
+let faturamentoPendente = null;
+
+async function processarConfirmacaoFaturamento(msg) {
+  const lower = msg.toLowerCase().trim();
+  if (!faturamentoPendente) return false;
+
+  if (lower === 'sim' || lower === 's' || lower === 'confirmar' || lower === 'confirma' || lower === 'ok') {
+    // Lança todos os faturamentos
+    const data = faturamentoPendente.data;
+    const hoje = new Date(data + 'T12:00:00');
+    const mes = hoje.getMonth() + 1;
+    const ano = hoje.getFullYear();
+    const dataFormatada = data.split('-').reverse().join('/');
+
+    appendChatMsg('ai', 'Lançando faturamentos...');
+    let sucessos = 0;
+    for (const item of faturamentoPendente.itens) {
+      try {
+        const r = await postAPI({
+          action: 'addLancamento',
+          empresa: item.empresa,
+          lancamento: { data: dataFormatada, categoria: 'Receita Bruta', descricao: 'Faturamento diário', valor: item.valor, fornecedor: COMPANIES_META[item.empresa].name, mes, ano }
+        });
+        if (r.status === 'ok') { sucessos++; lancamentosCache[item.empresa] = null; }
+      } catch(e) {}
+    }
+    faturamentoPendente = null;
+    appendChatMsg('ai', '✅ ' + sucessos + ' faturamentos lançados com sucesso! Tudo registrado nos Sheets. Posso ajudar com mais alguma coisa?');
+    return true;
+  }
+
+  if (lower === 'não' || lower === 'nao' || lower === 'n' || lower === 'cancelar') {
+    faturamentoPendente = null;
+    appendChatMsg('ai', 'Lançamento cancelado. Me diga os valores corretos quando quiser.');
+    return true;
+  }
+
+  return false;
+}
+
+async function sendChat() {
+  if (chatTyping) return;
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  if (!apiKey) {
+    appendChatMsg('ai', 'Para usar o assistente, configure sua chave de API da Anthropic em Configurações.');
+    showPage('settings');
+    return;
+  }
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('chatSuggestions').style.display = 'none';
+  appendChatMsg('user', msg);
+
+  // Verifica se é confirmação de faturamento pendente
+  if (faturamentoPendente) {
+    const handled = await processarConfirmacaoFaturamento(msg);
+    if (handled) return;
+  }
+
+  // Verifica se é lançamento de faturamento
+  const faturamentos = detectarFaturamento(msg);
+  if (faturamentos && faturamentos.length > 0) {
+    // Pede data se não especificada
+    const hoje = new Date();
+    const dataDefault = hoje.toISOString().split('T')[0];
+
+    // Monta confirmação
+    let confirmMsg = 'Encontrei os seguintes faturamentos para lancar:';
+    confirmMsg += ' Confirma? (sim/nao)';
+
+    faturamentoPendente = { itens: faturamentos, data: dataDefault };
+    appendChatMsg('ai', confirmMsg);
+    return;
+  }
+
+  chatHistory.push({ role: 'user', content: msg });
+  chatTyping = true;
+  document.getElementById('chatSendBtn').disabled = true;
+
+  // Typing indicator
+  const msgs = document.getElementById('chatMessages');
+  const typing = document.createElement('div');
+  typing.className = 'chat-msg ai'; typing.id = 'typingIndicator';
+  typing.innerHTML = `<div class="chat-avatar avatar-ai">✦</div><div class="chat-bubble" style="padding:0"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(typing); msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800, system: chatSystemPrompt || buildSystemPrompt(), messages: chatHistory.slice(-10) })
+    });
+    const data = await res.json();
+    document.getElementById('typingIndicator')?.remove();
+    chatTyping = false; document.getElementById('chatSendBtn').disabled = false;
+    if (data.content?.[0]) {
+      const reply = data.content[0].text;
+      chatHistory.push({ role: 'assistant', content: reply });
+      appendChatMsg('ai', reply);
+    } else if (data.error) {
+      appendChatMsg('ai', 'Erro: ' + data.error.message);
+    }
+  } catch(e) {
+    document.getElementById('typingIndicator')?.remove();
+    chatTyping = false; document.getElementById('chatSendBtn').disabled = false;
+    appendChatMsg('ai', 'Erro de conexão. Verifique sua internet.');
+  }
+}
+
+async function gerarAnalise() {
+  if (!apiKey) { showPage('settings'); showToast('Configure sua chave API primeiro'); return; }
+  showPage('chat');
+  document.getElementById('chatInput').value = 'Gere um relatório executivo completo do portfólio com análise de CMV, margens e principais alertas.';
+  sendChat();
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function salvarApiUrl() {
+  const url = document.getElementById('sheetsApiUrl').value.trim();
+  if (!url) return;
+  localStorage.setItem(API_URL_KEY, url);
+  apiUrl = url;
+  showToast('✓ URL da API salva!');
+  pingAPI();
+}
+
+function salvarAnthropicKey() {
+  const key = document.getElementById('anthropicKey').value.trim();
+  if (!key) return;
+  localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
+  apiKey = key;
+  showToast('✓ Chave API salva!');
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+
+  const navMap = { portfolio: 0, dre: 1, lancamentos: 2, chat: 3, settings: 4 };
+  const navItems = document.querySelectorAll('.nav-item');
+  if (navMap[id] !== undefined) navItems[navMap[id]]?.classList.add('active');
+
+  const titles = { portfolio: 'Portfólio', dre: 'DRE por Empresa', lancamentos: 'Lançamentos', chat: 'Assistente IA', settings: 'Configurações', 'empresa-chat': 'Lançamentos' };
+  document.getElementById('topbarTitle').textContent = titles[id] || id;
+
+  if (id === 'lancamentos') renderLancamentos();
+  if (id === 'dre') renderDRE(currentDREEmpresa);
+  if (id !== 'empresa-chat') document.querySelectorAll('.company-item').forEach(c => c.classList.remove('active'));
+  if (id === 'chat' && !chatInitialized) { chatInitialized = true; initChat(); }
+}
+
+function selectCompany(key) {
+  document.querySelectorAll('.company-item').forEach(c => c.classList.remove('active'));
+  const idx = COMPANIES_META[key].idx;
+  document.getElementById('ci-' + idx)?.classList.add('active');
+  goToDRE(key);
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id); });
+
+// ============================================================
+// UTILS
+// ============================================================
+function formatCurrency(v) {
+  return 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  // já está no formato DD/MM/AAAA
+  if (typeof d === 'string' && d.includes('/')) return d;
+  // formato ISO ou Date object
+  const dt = new Date(d);
+  if (isNaN(dt)) return String(d);
+  const day = String(dt.getUTCDate()).padStart(2, '0');
+  const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const year = dt.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function nomeMes(n) {
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return meses[(parseInt(n) - 1)] || n;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// EMPRESA CHAT
+// ============================================================
+let ecKey = '';
+let ecHistory = [];
+let ecTyping = false;
+let ecLog = [];
+let ecPending = [];
+
+function abrirEmpresaChat(k) {
+  ecKey = k;
+  ecHistory = [];
+  ecPending = [];
+  ecLog = [];
+
+  const m = COMPANIES_META[k];
+  document.getElementById('ecDot').style.background = m.cor;
+  document.getElementById('ecDot2').style.background = m.cor;
+  document.getElementById('ecName').textContent = m.name;
+  document.getElementById('ecName2').textContent = m.name;
+  document.getElementById('ecType').textContent = m.tipo;
+  document.getElementById('ecDate').textContent = new Date().toLocaleDateString('pt-BR', {weekday:'long',day:'numeric',month:'long'});
+
+  const rows = consolidadoCache?.[k] || [];
+  const row = rows[rows.length - 1];
+  document.getElementById('ecStats').innerHTML = row ?
+    '<div class="ec-stat-row"><span class="ec-stat-label">Receita</span><span class="ec-stat-value">' + formatCurrency(parseFloat(row['Receita Bruta'])||0) + '</span></div>' +
+    '<div class="ec-stat-row"><span class="ec-stat-label">CMV %</span><span class="ec-stat-value ' + (parseFloat(row['% CMV'])>40?'warn':'good') + '">' + (parseFloat(row['% CMV'])||0).toFixed(1) + '%</span></div>' +
+    '<div class="ec-stat-row"><span class="ec-stat-label">EBITDA</span><span class="ec-stat-value ' + (parseFloat(row['EBITDA'])>=0?'good':'bad') + '">' + formatCurrency(parseFloat(row['EBITDA'])||0) + '</span></div>' +
+    '<div class="ec-stat-row"><span class="ec-stat-label">Margem</span><span class="ec-stat-value">' + (parseFloat(row['% Margem EBITDA'])||0).toFixed(1) + '%</span></div>'
+    : '<div style="font-size:12px;color:var(--text3);padding:8px 0">Sem dados carregados</div>';
+
+  document.getElementById('ecMessages').innerHTML = '';
+  document.getElementById('sessionLog').innerHTML = '<div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">Nenhum lançamento ainda.</div>';
+  document.getElementById('logSummary').textContent = 'Sessão iniciada';
+  document.getElementById('driveFolderLink').style.display = 'none';
+
+  document.querySelectorAll('.company-item').forEach(c => c.classList.remove('active'));
+  document.getElementById('ci-' + m.idx)?.classList.add('active');
+
+  const hr = new Date().getHours();
+  const g = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
+  ecAppendMsg('ai', g + '! Pronto para ' + m.name + '.\n\n• Informe o faturamento do dia\n• Descreva uma despesa ou compra\n• Envie foto de nota fiscal (📄)\n• Peça análise ou relatório');
+
+  showPage('empresa-chat');
+}
+
+function ecAppendMsg(role, text) {
+  const msgs = document.getElementById('ecMessages');
+  const isUser = role === 'user';
+  const now = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+  const div = document.createElement('div');
+  div.className = 'emp-msg' + (isUser ? ' user' : '');
+  const paras = text.split('\n').filter(Boolean).map(p => '<p>' + p + '</p>').join('');
+  div.innerHTML = '<div class="emp-avatar ' + (isUser?'user':'ai') + '">' + (isUser?'M':'✦') + '</div>' +
+    '<div><div class="emp-bubble">' + (paras || '<p>' + text + '</p>') + '</div><div class="emp-time">' + now + '</div></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function ecShowTyping() {
+  const msgs = document.getElementById('ecMessages');
+  const div = document.createElement('div');
+  div.className = 'emp-msg'; div.id = 'ecTyping';
+  div.innerHTML = '<div class="emp-avatar ai">✦</div><div class="emp-bubble" style="padding:0"><div class="chat-typing"><span></span><span></span><span></span></div></div>';
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+
+const CATS_OPTIONS = '<option value="Receita Bruta">Receita Bruta</option><option value="CMV">CMV</option><option value="Custo com Pessoal">Custo com Pessoal</option><option value="Embalagens">Embalagens</option><option value="Higiene e Limpeza">Higiene e Limpeza</option><option value="Consumo Interno">Consumo Interno</option><option value="Marketing / Patrocínio">Marketing / Patrocínio</option><option value="Despesas Operacionais">Despesas Operacionais</option><option value="Despesas Fixas">Despesas Fixas</option><option value="Despesas Diversas">Despesas Diversas</option><option value="Manutenção">Manutenção</option>';
+
+function toggleEditItem(i) {
+  const el = document.getElementById('ccedit-' + i);
+  if (el) el.classList.toggle('open');
+}
+
+function updatePendingItem(i) {
+  const desc = document.getElementById('ccdesc-' + i)?.value;
+  const cat = document.getElementById('cccat-' + i)?.value;
+  const val = parseFloat(document.getElementById('ccval-' + i)?.value);
+  const forn = document.getElementById('ccforn-' + i)?.value;
+  if (desc !== undefined) ecPending[i].descricao = desc;
+  if (cat !== undefined) {
+    ecPending[i].categoria = cat;
+    // Update visible pill
+    const pill = document.getElementById('ccpill-' + i);
+    if (pill) pill.textContent = cat;
+  }
+  if (!isNaN(val)) {
+    ecPending[i].valor = val;
+    const valEl = document.getElementById('ccvalshow-' + i);
+    if (valEl) valEl.textContent = formatCurrency(val);
+  }
+  if (forn !== undefined) ecPending[i]._fornecedor = forn;
+  // Update total
+  const total = ecPending.reduce((s, it) => {
+    const cb = document.getElementById('cc-' + it.id);
+    return s + ((cb && cb.checked) ? (it.valor||0) : 0);
+  }, 0);
+  const hdr = document.getElementById('ccTotal');
+  if (hdr) hdr.textContent = formatCurrency(total);
+}
+
+
+// ============================================================
+// CONFIRM COM PREVIEW DAS NOTAS
+// ============================================================
+function toggleNotaPreview(id) {
+  const wrap = document.getElementById('npwrap-' + id);
+  const btn = document.getElementById('npbtn-' + id);
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('open');
+  btn.textContent = isOpen ? '▲ Ocultar nota' : '▼ Ver nota';
+}
+
+function toggleZoomImg(img) {
+  img.classList.toggle('zoomed');
+}
+
+function toggleNotaPreview(id) {
+  const wrap = document.getElementById('npwrap-' + id);
+  const btn = document.getElementById('npbtn-' + id);
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('open');
+  if (btn) btn.textContent = isOpen ? '▲ Ocultar nota' : '▼ Ver nota';
+}
+
+function toggleZoomImg(img) {
+  img.classList.toggle('zoomed');
+}
+
+function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
+  ecPending = itens.map((it, i) => ({...it, id: i}));
+  const msgs = document.getElementById('ecMessages');
+  const hoje = new Date().toISOString().split('T')[0];
+  const dataVal = dataStr || hoje;
+  const total = ecPending.reduce((s, i) => s + (i.valor||0), 0);
+
+  // Mapeia preview por nome de arquivo
+  const previewMap = {};
+  (previews || []).forEach(p => { previewMap[p.name] = p; });
+
+  // Agrupa itens por arquivo (_nota)
+  const gruposOrdem = [];
+  const gruposMap = {};
+  ecPending.forEach(it => {
+    const key = it._nota || '_sem_nota';
+    if (!gruposMap[key]) { gruposMap[key] = []; gruposOrdem.push(key); }
+    gruposMap[key].push(it);
+  });
+
+  let gruposHtml = '';
+  gruposOrdem.forEach((nomeArq, gi) => {
+    const itensGrupo = gruposMap[nomeArq];
+    const preview = previewMap[nomeArq];
+    const isImg = preview && (preview.mimeType === 'image/jpeg' || preview.mimeType === 'image/png' || preview.mimeType === 'image/gif' || preview.mimeType === 'image/webp');
+    const isPdf = preview && preview.mimeType === 'application/pdf';
+
+    let previewHtml = '';
+    if (preview) {
+      const dataUrl = 'data:' + preview.mimeType + ';base64,' + preview.b64;
+      let imgHtml = '';
+      if (isImg) {
+        imgHtml = '<div style="padding:8px;text-align:center"><img class="nota-preview-img" src="' + dataUrl + '" onclick="toggleZoomImg(this)" title="Clique para ampliar"></div>';
+      } else if (isPdf) {
+        imgHtml = '<div class="nota-preview-pdf">📋 PDF — <a href="' + dataUrl + '" target="_blank">Abrir em nova aba ↗</a></div>';
+      }
+      previewHtml = '<div class="nota-preview-wrap">' +
+        '<div class="nota-preview-header">' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">📄 ' + nomeArq + '</span>' +
+        '<button class="nota-preview-toggle" id="npbtn-' + gi + '" onclick="toggleNotaPreview(' + gi + ')">▼ Ver nota</button>' +
+        '</div>' +
+        '<div class="nota-preview-img-wrap" id="npwrap-' + gi + '">' + imgHtml + '</div>' +
+        '</div>';
+    } else {
+      previewHtml = '<div style="padding:6px 14px;font-size:11px;color:var(--text3);border-bottom:1px solid var(--border)">📄 ' + nomeArq + '</div>';
+    }
+
+    const iHtml = itensGrupo.map(it => {
+      const i = it.id;
+      const catClass = it.categoria?.includes('Receita') ? 'cat-receita' : it.categoria === 'CMV' ? 'cat-cmv' : it.categoria?.includes('Pessoal') ? 'cat-pessoal' : 'cat-desp';
+      const catsSelect = CATS_OPTIONS.replace('value="' + it.categoria + '"', 'value="' + it.categoria + '" selected');
+      return '<div>' +
+        '<div class="confirm-item">' +
+        '<input type="checkbox" class="confirm-item-check" id="cc-' + i + '" checked onchange="updatePendingItem(' + i + ')">' +
+        '<span class="confirm-item-desc" onclick="toggleEditItem(' + i + ')" style="cursor:pointer">' + (it.descricao||'') + '</span>' +
+        '<span class="confirm-item-cat cat-pill ' + catClass + '" id="ccpill-' + i + '" onclick="toggleEditItem(' + i + ')" style="cursor:pointer">' + (it.categoria||'—') + '</span>' +
+        '<span class="confirm-item-val" id="ccvalshow-' + i + '">' + formatCurrency(it.valor||0) + '</span>' +
+        '<button class="confirm-item-edit-btn" onclick="toggleEditItem(' + i + ')" title="Editar">✏️</button>' +
+        '</div>' +
+        '<div class="confirm-item-edit" id="ccedit-' + i + '">' +
+        '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Descrição</span></div>' +
+        '<input type="text" id="ccdesc-' + i + '" value="' + (it.descricao||'').replace(/"/g, '&quot;') + '" placeholder="Descrição" onchange="updatePendingItem(' + i + ')">' +
+        '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Categoria</span></div>' +
+        '<select id="cccat-' + i + '" onchange="updatePendingItem(' + i + ')">' + catsSelect + '</select>' +
+        '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Valor (R$)</span></div>' +
+        '<input type="number" id="ccval-' + i + '" value="' + (it.valor||0) + '" step="0.01" onchange="updatePendingItem(' + i + ')">' +
+        '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Fornecedor individual</span></div>' +
+        '<input type="text" id="ccforn-' + i + '" value="' + (it.fornecedor||it._fornecedor||'').replace(/"/g, '&quot;') + '" placeholder="Deixe vazio para usar o fornecedor geral">' +
+        '</div></div>';
+    }).join('');
+
+    gruposHtml += '<div style="border-bottom:1px solid var(--border)">' + previewHtml + iHtml + '</div>';
+  });
+
+  const div = document.createElement('div');
+  div.className = 'emp-msg'; div.id = 'confirmCard';
+  div.innerHTML = '<div class="emp-avatar ai">✦</div><div style="flex:1;max-width:580px">' +
+    '<div class="confirm-card">' +
+    '<div class="confirm-header"><span>Confirme e edite os lançamentos</span><span id="ccTotal">' + formatCurrency(total) + '</span></div>' +
+    gruposHtml +
+    '<div class="confirm-edit">' +
+    '<label style="font-size:11px;color:var(--text3)">Data:</label>' +
+    '<input type="date" id="ccData" value="' + dataVal + '" style="width:140px">' +
+    '<label style="font-size:11px;color:var(--text3)">Fornecedor geral:</label>' +
+    '<input type="text" id="ccForn" value="' + (fornecedor||'').replace(/"/g,'&quot;') + '" placeholder="Fornecedor" style="flex:1;min-width:100px">' +
+    '</div>' +
+    '<div class="confirm-actions">' +
+    '<button class="btn btn-ghost btn-sm" style="flex:1" onclick="cancelarConfirm()">✕ Cancelar</button>' +
+    '<button class="btn btn-primary btn-sm" style="flex:2" onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
+    '</div></div></div>';
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+
+
+function ecShowConfirm(itens, fornecedor, dataStr) {
+  ecPending = itens.map((it, i) => ({...it, id: i}));
+  const msgs = document.getElementById('ecMessages');
+  const div = document.createElement('div');
+  div.className = 'emp-msg'; div.id = 'confirmCard';
+  const hoje = new Date().toISOString().split('T')[0];
+  const dataVal = dataStr || hoje;
+  const total = ecPending.reduce((s, i) => s + (i.valor||0), 0);
+
+  let iHtml = ecPending.map((it, i) => {
+    const catClass = it.categoria?.includes('Receita') ? 'cat-receita' : it.categoria === 'CMV' ? 'cat-cmv' : it.categoria?.includes('Pessoal') ? 'cat-pessoal' : 'cat-desp';
+    const catsSelect = CATS_OPTIONS.replace('value="' + it.categoria + '"', 'value="' + it.categoria + '" selected');
+    return '<div>' +
+      '<div class="confirm-item">' +
+      '<input type="checkbox" class="confirm-item-check" id="cc-' + i + '" checked onchange="updatePendingItem(' + i + ')">' +
+      '<span class="confirm-item-desc" style="cursor:pointer" onclick="toggleEditItem(' + i + ')" title="Clique para editar">' + it.descricao + '</span>' +
+      '<span class="confirm-item-cat cat-pill ' + catClass + '" id="ccpill-' + i + '" style="cursor:pointer" onclick="toggleEditItem(' + i + ')" title="Clique para editar categoria">' + (it.categoria||'—') + '</span>' +
+      '<span class="confirm-item-val" id="ccvalshow-' + i + '">' + formatCurrency(it.valor||0) + '</span>' +
+      '<button class="confirm-item-edit-btn" onclick="toggleEditItem(' + i + ')" title="Editar">✏️</button>' +
+      '</div>' +
+      '<div class="confirm-item-edit" id="ccedit-' + i + '">' +
+      '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Descrição</span></div>' +
+      '<input type="text" id="ccdesc-' + i + '" value="' + (it.descricao||'') + '" placeholder="Descrição" onchange="updatePendingItem(' + i + ')">' +
+      '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Categoria</span></div>' +
+      '<select id="cccat-' + i + '" onchange="updatePendingItem(' + i + ')">' + catsSelect + '</select>' +
+      '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Valor (R$)</span></div>' +
+      '<input type="number" id="ccval-' + i + '" value="' + (it.valor||0) + '" step="0.01" onchange="updatePendingItem(' + i + ')">' +
+      '<div class="confirm-item-edit-row"><span class="confirm-item-edit-label">Fornecedor individual (opcional)</span></div>' +
+      '<input type="text" id="ccforn-' + i + '" value="' + (it.fornecedor||it._fornecedor||'') + '" placeholder="Deixe vazio para usar o fornecedor geral">' +
+      '</div>' +
+      '</div>';
+  }).join('');
+
+  div.innerHTML = '<div class="emp-avatar ai">✦</div><div style="flex:1;max-width:520px">' +
+    '<div class="confirm-card">' +
+    '<div class="confirm-header"><span>Confirme e edite os lançamentos</span><span id="ccTotal">' + formatCurrency(total) + '</span></div>' +
+    iHtml +
+    '<div class="confirm-edit">' +
+    '<label style="font-size:11px;color:var(--text3)">Data:</label>' +
+    '<input type="date" id="ccData" value="' + dataVal + '" style="width:140px">' +
+    '<label style="font-size:11px;color:var(--text3)">Fornecedor geral:</label>' +
+    '<input type="text" id="ccForn" value="' + (fornecedor||'') + '" placeholder="Fornecedor" style="flex:1;min-width:100px">' +
+    '</div>' +
+    '<div style="padding:6px 14px;font-size:11px;color:var(--text3)">✏️ Clique em qualquer item para editar descrição, categoria ou valor</div>' +
+    '<div class="confirm-actions">' +
+    '<button class="btn btn-ghost btn-sm" style="flex:1" onclick="cancelarConfirm()">✕ Cancelar</button>' +
+    '<button class="btn btn-primary btn-sm" style="flex:2" onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
+    '</div></div></div>';
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function confirmarLancs() {
+  const data = document.getElementById('ccData')?.value;
+  const fornGeral = document.getElementById('ccForn')?.value || '—';
+  const sel = ecPending.filter((_, i) => { const cb = document.getElementById('cc-' + i); return cb && cb.checked; });
+  if (!sel.length) { showToast('Selecione ao menos um item'); return; }
+  if (!data) { showToast('Informe a data'); return; }
+
+  // Captura edições finais antes de fechar
+  ecPending.forEach((it, i) => {
+    const desc = document.getElementById('ccdesc-' + i)?.value;
+    const cat = document.getElementById('cccat-' + i)?.value;
+    const val = parseFloat(document.getElementById('ccval-' + i)?.value);
+    const forn = document.getElementById('ccforn-' + i)?.value;
+    if (desc) it.descricao = desc;
+    if (cat) it.categoria = cat;
+    if (!isNaN(val)) it.valor = val;
+    if (forn) it._fornecedorItem = forn;
+  });
+
+  document.getElementById('confirmCard')?.remove();
+  ecPending = [];
+
+  const [ano, mes] = data.split('-');
+  const dataFmt = data.split('-').reverse().join('/');
+  ecAppendMsg('ai', 'Salvando ' + sel.length + ' lançamento(s)...');
+
+  let ok = 0, fail = 0;
+  for (const it of sel) {
+    // Usa fornecedor individual se preenchido, senão usa o geral
+    const fornItem = it._fornecedorItem || fornGeral;
+    try {
+      const r = await postAPI({
+        action: 'addLancamento', empresa: ecKey,
+        lancamento: { data: dataFmt, categoria: it.categoria, descricao: it.descricao, valor: it.valor||0, fornecedor: fornItem, mes: parseInt(mes), ano: parseInt(ano) }
+      });
+      if (r.status === 'ok') { ok++; addLogItem({descricao: it.descricao, categoria: it.categoria, valor: it.valor||0, status: 'success', data: dataFmt}); }
+      else { fail++; addLogItem({descricao: it.descricao, categoria: it.categoria, valor: it.valor||0, status: 'error', data: dataFmt}); }
+    } catch { fail++; addLogItem({descricao: it.descricao, categoria: it.categoria, valor: it.valor||0, status: 'error', data: dataFmt}); }
+  }
+
+  lancamentosCache[ecKey] = null;
+  const msg = ok > 0 && !fail ? '✅ ' + ok + ' lançamento(s) salvos com sucesso!' :
+              ok > 0 ? '⚠️ ' + ok + ' salvos, ' + fail + ' com erro. Veja o log.' :
+              '❌ Erro ao salvar. Verifique a conexão com a API.';
+  ecAppendMsg('ai', msg);
+}
+
+function cancelarConfirm() {
+  document.getElementById('confirmCard')?.remove();
+  ecPending = [];
+  ecAppendMsg('ai', 'Cancelado. Me diga quando quiser tentar novamente.');
+}
+
+function addLogItem(item) {
+  ecLog.unshift(item);
+  const cnt = ecLog.filter(i => i.status === 'success').length;
+  const tot = ecLog.filter(i => i.status === 'success').reduce((s, i) => s + (i.valor||0), 0);
+  document.getElementById('logSummary').textContent = cnt + ' lançamento(s) · ' + formatCurrency(tot);
+  const catClass = item.categoria?.includes('Receita') ? 'cat-receita' : item.categoria === 'CMV' ? 'cat-cmv' : item.categoria?.includes('Pessoal') ? 'cat-pessoal' : 'cat-desp';
+  document.getElementById('sessionLog').innerHTML = ecLog.slice(0, 25).map(i =>
+    '<div class="log-item ' + i.status + '">' +
+    '<div class="log-item-desc">' + i.descricao + '</div>' +
+    '<div class="log-item-meta">' +
+    '<span class="cat-pill ' + catClass + '" style="font-size:10px">' + i.categoria + '</span>' +
+    '<span class="log-item-val">' + formatCurrency(i.valor||0) + '</span>' +
+    '<span class="log-item-status">' + (i.status === 'success' ? '✓ salvo' : '✗ erro') + '</span>' +
+    '</div></div>'
+  ).join('');
+}
+
+function exportarLog() {
+  if (!ecLog.length) { showToast('Nenhum lançamento nesta sessão'); return; }
+  let csv = 'Data,Categoria,Descricao,Valor,Status\n';
+  ecLog.forEach(i => { csv += i.data + ',' + i.categoria + ',"' + i.descricao + '",' + (i.valor||0) + ',' + i.status + '\n'; });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'log-' + ecKey + '-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
+
+// ============================================================
+// PROCESSAR NOTA FISCAL + UPLOAD DRIVE
+// ============================================================
+async function processarNFEmpresa(files) {
+  if (!files?.length) return;
+  if (!apiKey) { showToast('Configure a chave API em Configurações'); return; }
+
+  const fl = Array.from(files);
+  ecAppendMsg('ai', '📄 Recebendo ' + fl.length + ' arquivo(s)... Analisando com IA e salvando no Drive.');
+
+  const msgs = document.getElementById('ecMessages');
+  const filaDiv = document.createElement('div');
+  filaDiv.className = 'emp-msg'; filaDiv.id = 'ecNFFila';
+  filaDiv.innerHTML = '<div class="emp-avatar ai">✦</div>' +
+    '<div class="nf-fila-wrap">' +
+    fl.map(f => '<div class="nf-fila-item" id="nfi-' + btoa(f.name).replace(/=/g,'') + '">' +
+      '<span id="nfi-ic-' + btoa(f.name).replace(/=/g,'') + '">⏳</span>' +
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
+      '<span id="nfi-st-' + btoa(f.name).replace(/=/g,'') + '" style="color:var(--text3);font-size:11px">aguardando</span>' +
+    '</div>').join('') + '</div>';
+  msgs.appendChild(filaDiv); msgs.scrollTop = msgs.scrollHeight;
+
+  let allItens = [], fornFinal = '', dataNF = '', driveUrls = [], filePreviews = [];
+
+  for (const file of fl) {
+    const sid = btoa(file.name).replace(/=/g,'');
+    const icEl = document.getElementById('nfi-ic-' + sid);
+    const stEl = document.getElementById('nfi-st-' + sid);
+    if (icEl) icEl.textContent = '🔄';
+    if (stEl) stEl.textContent = 'lendo...';
+
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = e => res(e.target.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+
+      // Armazena preview
+      filePreviews.push({ name: file.name, b64, mimeType: file.type });
+
+      const mt = file.type === 'application/pdf' ? 'application/pdf' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const m = COMPANIES_META[ecKey];
+
+      // 1. Leitura IA primeiro (para pegar o fornecedor)
+      if (stEl) stEl.textContent = 'lendo IA...';
+      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia todos os itens com valores. Classifique cada um em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao. CMV = insumos, alimentos, bebidas, materia-prima. Extraia: data (DD/MM/AAAA), fornecedor, numero NF. Responda SOMENTE JSON sem markdown: {"fornecedor":"","data":"DD/MM/AAAA","nf_numero":"","itens":[{"descricao":"","valor":0.00,"categoria":"CMV","quantidade":""}]}';
+
+      const mc = file.type === 'application/pdf'
+        ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
+        : [{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:prompt}];
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({model:'claude-opus-4-6',max_tokens:2000,messages:[{role:'user',content:mc}]})
+      });
+      const d = await res.json();
+
+      if (d.content?.[0]) {
+        const parsed = JSON.parse(d.content[0].text.replace(/```json|```/g,'').trim());
+        allItens = allItens.concat((parsed.itens || []).map(it => ({...it, _nota: file.name})));
+        if (!fornFinal && parsed.fornecedor) fornFinal = parsed.fornecedor;
+        if (!dataNF && parsed.data) dataNF = parsed.data;
+        if (icEl) icEl.textContent = '✅';
+        if (stEl) stEl.textContent = (parsed.itens?.length||0) + ' itens';
+
+        // 2. Upload para Google Drive com fornecedor já identificado
+        if (stEl) stEl.textContent = '💾 salvando no Drive...';
+        try {
+          const forn = parsed.fornecedor || '_Sem Fornecedor';
+          const driveRes = await postAPI({
+            action: 'uploadNota',
+            empresa: ecKey,
+            fileName: file.name,
+            base64Data: b64,
+            mimeType: mt,
+            fornecedor: forn,
+            descricao: 'NF ' + forn + ' — ' + (parsed.data || new Date().toLocaleDateString('pt-BR'))
+          });
+          if (driveRes.status === 'ok' && driveRes.result?.fileUrl) {
+            driveUrls.push({
+              name: file.name,
+              url: driveRes.result.fileUrl,
+              folderUrl: driveRes.result.folderUrl,
+              pasta: driveRes.result.pasta
+            });
+            if (stEl) stEl.textContent = '✅ ' + (parsed.itens?.length||0) + ' itens · Drive ✓';
+          } else {
+            if (stEl) stEl.textContent = '✅ ' + (parsed.itens?.length||0) + ' itens · Drive ✗';
+          }
+        } catch(eDrive) {
+          if (stEl) stEl.textContent = '✅ ' + (parsed.itens?.length||0) + ' itens · Drive ✗';
+        }
+      } else throw new Error('sem resposta');
+    } catch (e) {
+      if (icEl) icEl.textContent = '❌';
+      if (stEl) stEl.textContent = 'erro';
+    }
+  }
+
+  // Mostra link do Drive se upload funcionou
+  if (driveUrls.length > 0 && driveUrls[0].folderUrl) {
+    const link = document.getElementById('driveFolderLink');
+    if (link) { link.href = driveUrls[0].folderUrl; link.style.display = 'inline-flex'; }
+  }
+
+  if (!allItens.length) {
+    ecAppendMsg('ai', '❌ Não consegui extrair itens. Tente imagens mais nítidas ou descreva manualmente.');
+    return;
+  }
+
+  let dInp = '';
+  if (dataNF) { const pts = dataNF.split('/'); if (pts.length === 3) dInp = pts[2] + '-' + pts[1] + '-' + pts[0]; }
+
+  let driveMsg = '';
+  if (driveUrls.length > 0) {
+    const pastas = [...new Set(driveUrls.map(d => d.pasta).filter(Boolean))];
+    driveMsg = '\n📁 Salvo no Drive: ' + (pastas.length > 0 ? pastas.join(', ') : driveUrls.length + ' arquivo(s)');
+  }
+
+  ecAppendMsg('ai', '✓ ' + allItens.length + ' itens extraídos.' + driveMsg + '\nRevise e confirme:');
+
+  // Mostra previews das notas + card de confirmação
+  ecShowConfirmComPreview(allItens, fornFinal, dInp, filePreviews);
+}
+
+// ============================================================
+// ENVIAR MENSAGEM EMPRESA
+// ============================================================
+function sugerirAcao(t) {
+  const inp = document.getElementById('ecInput');
+  if (t === 'faturamento') inp.value = 'Faturamento de hoje: ';
+  else if (t === 'despesa') inp.value = 'Despesa: ';
+  else if (t === 'relatorio') { inp.value = 'Gere um relatório da situação atual com alertas.'; enviarMsgEmpresa(); return; }
+  inp.focus();
+}
+
+async function enviarMsgEmpresa() {
+  if (ecTyping) return;
+  const inp = document.getElementById('ecInput');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  if (!apiKey) { showToast('Configure a chave API em Configurações'); showPage('settings'); return; }
+
+  inp.value = ''; inp.style.height = 'auto';
+  ecAppendMsg('user', msg);
+  ecHistory.push({role:'user', content:msg});
+  ecTyping = true;
+  document.getElementById('ecSendBtn').disabled = true;
+  ecShowTyping();
+
+  const m = COMPANIES_META[ecKey];
+  const rows = consolidadoCache?.[ecKey] || [];
+  const row = rows[rows.length - 1];
+  const dreInfo = row ?
+    'DRE: Receita ' + formatCurrency(parseFloat(row['Receita Bruta'])||0) +
+    ' | CMV ' + (parseFloat(row['% CMV'])||0).toFixed(1) + '%' +
+    ' | EBITDA ' + formatCurrency(parseFloat(row['EBITDA'])||0) +
+    ' | Margem ' + (parseFloat(row['% Margem EBITDA'])||0).toFixed(1) + '%' : '';
+
+  const CATS = ['Receita Bruta','CMV','Custo com Pessoal','Embalagens','Higiene e Limpeza',
+    'Consumo Interno','Marketing / Patrocínio','Despesas Operacionais','Despesas Fixas','Despesas Diversas','Manutenção'];
+
+  const system = 'Você é o assistente financeiro de ' + m.name + ' (' + m.tipo + '), gerenciada por Matheus Saldanha Garcia.\n' +
+    (dreInfo ? dreInfo + '\n' : '') +
+    'CATEGORIAS: ' + CATS.join(', ') + '\n\n' +
+    'QUANDO identificar um lançamento financeiro, responda com texto E inclua JSON entre tags:\n' +
+    '<LANCAMENTO>{"categoria":"Receita Bruta","descricao":"Faturamento diário","valor":0.00,"fornecedor":"' + m.name + '"}</LANCAMENTO>\n' +
+    'Para múltiplos itens use múltiplas tags <LANCAMENTO>.\n' +
+    'CMV = insumos, alimentos, bebidas, matéria-prima.\n' +
+    'REGRAS: seja direto e conciso; use R$ formatado; responda em pt-BR; se receber só um valor sem contexto, pergunte se é receita ou despesa.';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,system,messages:ecHistory.slice(-12)})
+    });
+    const d = await res.json();
+    document.getElementById('ecTyping')?.remove();
+    ecTyping = false; document.getElementById('ecSendBtn').disabled = false;
+
+    if (d.content?.[0]) {
+      const reply = d.content[0].text;
+      ecHistory.push({role:'assistant',content:reply});
+      const matches = [...reply.matchAll(/<LANCAMENTO>([\s\S]*?)<\/LANCAMENTO>/g)];
+      if (matches.length > 0) {
+        const itens = [];
+        for (const match of matches) { try { itens.push(JSON.parse(match[1])); } catch {} }
+        const txt = reply.replace(/<LANCAMENTO>[\s\S]*?<\/LANCAMENTO>/g,'').trim();
+        if (txt) ecAppendMsg('ai', txt);
+        if (itens.length > 0) { ecAppendMsg('ai', 'Confirme o lançamento abaixo:'); ecShowConfirm(itens, itens[0].fornecedor||'', ''); }
+      } else {
+        ecAppendMsg('ai', reply);
+      }
+    } else if (d.error) {
+      ecAppendMsg('ai', 'Erro API: ' + d.error.message);
+    }
+  } catch(e) {
+    document.getElementById('ecTyping')?.remove();
+    ecTyping = false; document.getElementById('ecSendBtn').disabled = false;
+    ecAppendMsg('ai', 'Erro de conexão. Verifique sua internet.');
+  }
+}
+
+</script>
+</body>
+</html>
