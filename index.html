@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agência Contábil — Matheus Saldanha Garcia</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
   --bg: #f5f5f3;
@@ -288,6 +289,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .period-label { font-size: 12px; color: var(--text3); }
 .period-value { font-size: 13px; font-weight: 500; color: var(--gold); }
 
+/* GRÁFICOS DRE */
+.dre-charts-section { margin-top: 24px; }
+.dre-charts-title { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); margin-bottom: 16px; }
+.dre-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.dre-chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px 12px; }
+.dre-chart-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 10px; font-weight: 500; }
+.dre-chart-canvas-wrap { position: relative; height: 160px; }
+@media (max-width: 900px) { .dre-charts-grid { grid-template-columns: 1fr; } }
+
 /* LOGIN */
 #loginOverlay { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: none; align-items: center; justify-content: center; }
 #loginOverlay.show { display: flex; }
@@ -545,6 +555,25 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
         <div class="metric-card">
           <div class="metric-card-title">Indicadores-chave</div>
           <div id="dreIndicadores"><div class="loading-overlay" style="padding:20px"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRÁFICOS EVOLUÇÃO MENSAL -->
+    <div class="dre-charts-section" id="dreChartSection" style="display:none">
+      <div class="dre-charts-title">Evolução Mensal</div>
+      <div class="dre-charts-grid">
+        <div class="dre-chart-card">
+          <div class="dre-chart-label">Receita Bruta</div>
+          <div class="dre-chart-canvas-wrap"><canvas id="chartReceita"></canvas></div>
+        </div>
+        <div class="dre-chart-card">
+          <div class="dre-chart-label">CMV % — referência 40%</div>
+          <div class="dre-chart-canvas-wrap"><canvas id="chartCMV"></canvas></div>
+        </div>
+        <div class="dre-chart-card">
+          <div class="dre-chart-label">EBITDA</div>
+          <div class="dre-chart-canvas-wrap"><canvas id="chartEBITDA"></canvas></div>
         </div>
       </div>
     </div>
@@ -1315,6 +1344,75 @@ async function renderDRE(empresaKey) {
     <div class="metric-item"><span class="metric-item-label">Receita Bruta</span><span class="metric-item-value">${formatCurrency(receita)}</span></div>
     <div class="metric-item"><span class="metric-item-label">EBITDA</span><span class="metric-item-value ${ebitda >= 0 ? 'val-positive' : 'val-negative'}">${formatCurrency(ebitda)}</span></div>
     <div class="metric-item"><span class="metric-item-label">Total Despesas</span><span class="metric-item-value val-negative">${formatCurrency(totalDesp)}</span></div>`;
+
+  renderGraficosDRE(empresaKey);
+}
+
+// ============================================================
+// GRÁFICOS EVOLUÇÃO MENSAL
+// ============================================================
+const dreCharts = {};
+
+function renderGraficosDRE(empresaKey) {
+  const rows = consolidadoCache?.[empresaKey];
+  const section = document.getElementById('dreChartSection');
+  if (!rows || rows.length < 2) { if (section) section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const labels  = rows.map(r => (meses[parseInt(r['Mês'])-1] || r['Mês']) + '/' + String(r['Ano']).slice(-2));
+  const receitas = rows.map(r => parseFloat(r['Receita Bruta']) || 0);
+  const cmvPcts  = rows.map(r => parseFloat(r['% CMV']) || 0);
+  const ebitdas  = rows.map(r => parseFloat(r['EBITDA']) || 0);
+
+  const baseOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {} }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 }, color: '#9a9590', maxRotation: 45 } },
+      y: { grid: { color: '#e8e7e4' }, border: { dash: [3, 3] }, ticks: { font: { family: 'DM Sans', size: 10 }, color: '#9a9590' } }
+    }
+  };
+
+  function makeChart(id, data, color, yFmt, referencia) {
+    if (dreCharts[id]) { dreCharts[id].destroy(); delete dreCharts[id]; }
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const datasets = [{
+      data, borderColor: color, backgroundColor: color + '14',
+      borderWidth: 2, pointRadius: 3, pointHoverRadius: 5,
+      fill: true, tension: 0.35
+    }];
+    if (referencia !== undefined) {
+      datasets.push({
+        data: labels.map(() => referencia),
+        borderColor: 'rgba(160,112,16,0.45)',
+        borderWidth: 1.5, borderDash: [5, 4],
+        pointRadius: 0, fill: false
+      });
+    }
+    const opts = JSON.parse(JSON.stringify(baseOpts));
+    opts.plugins.legend.display = referencia !== undefined;
+    if (referencia !== undefined) {
+      opts.plugins.legend.labels = { font: { family: 'DM Sans', size: 10 }, color: '#9a9590', boxWidth: 16 };
+    }
+    opts.scales.y.ticks.callback = yFmt === 'pct'
+      ? v => v.toFixed(1) + '%'
+      : v => 'R$' + (Math.abs(v) >= 1000 ? (v/1000).toFixed(0) + 'k' : v.toFixed(0));
+    opts.plugins.tooltip.callbacks.label = ctx =>
+      yFmt === 'pct'
+        ? ctx.parsed.y.toFixed(1) + '%'
+        : 'R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+    dreCharts[id] = new Chart(canvas, { type: 'line', data: { labels, datasets }, options: opts });
+  }
+
+  makeChart('chartReceita', receitas, '#1e7a4a', 'brl');
+  makeChart('chartCMV',     cmvPcts,  '#b83232', 'pct', 40);
+  makeChart('chartEBITDA',  ebitdas,  '#8a5f28', 'brl');
 }
 
 // ============================================================
@@ -2212,7 +2310,8 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
 
     // Data e fornecedor individuais por nota — pega do primeiro item do grupo
     const primeiroItem = itensGrupo[0];
-    const dataGrupo = primeiroItem?._dataNF || dataStr || hoje;
+    // _dataNF é null quando a data não foi encontrada na nota — NÃO faz fallback para hoje
+    const dataGrupo = primeiroItem?._dataNF ?? null;
     const fornGrupo = primeiroItem?._fornecedor || primeiroItem?.fornecedor || '';
 
     let previewHtml = '';
@@ -2236,9 +2335,15 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
     }
 
     // Campos de data e fornecedor individuais por nota
+    const dataMissing = !dataGrupo;
+    const dateInputStyle = dataMissing
+      ? 'width:220px;background:var(--surface);border:2px solid var(--red);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)'
+      : 'width:140px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)';
+    const dateInputValue = dataGrupo ? 'value="' + dataGrupo + '"' : '';
+    const dateInputPlaceholder = dataMissing ? 'placeholder="⚠️ Data não encontrada — preencha"' : '';
     const camposNota = '<div style="display:flex;gap:10px;align-items:center;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap">' +
       '<label style="font-size:11px;color:var(--text3)">Data:</label>' +
-      '<input type="date" id="ccData-' + gi + '" value="' + dataGrupo + '" style="width:140px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">' +
+      '<input type="date" id="ccData-' + gi + '" ' + dateInputValue + ' ' + dateInputPlaceholder + ' oninput="verificarDatasPreenchidas()" style="' + dateInputStyle + '">' +
       '<label style="font-size:11px;color:var(--text3)">Fornecedor:</label>' +
       '<input type="text" id="ccForn-' + gi + '" value="' + (fornGrupo).replace(/"/g,'&quot;') + '" placeholder="Fornecedor desta nota" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text)">' +
       '</div>';
@@ -2288,15 +2393,38 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
     gi,
     ids: gruposMap[k].map(it => it.id)
   })));
+  const totalGrupos = gruposOrdem.length;
+  const algumaSemData = gruposOrdem.some((k) => !gruposMap[k][0]?._dataNF);
+  div.dataset.totalGrupos = totalGrupos;
   div.innerHTML = '<div class="emp-avatar ai">✦</div><div style="flex:1;max-width:580px">' +
     '<div class="confirm-card">' +
     '<div class="confirm-header"><span>Confirme e edite os lançamentos</span><span id="ccTotal">' + formatCurrency(total) + '</span></div>' +
     gruposHtml +
     '<div class="confirm-actions" style="padding:12px 14px;display:flex;gap:8px">' +
     '<button class="btn btn-ghost btn-sm" style="flex:1" onclick="cancelarConfirm()">✕ Cancelar</button>' +
-    '<button class="btn btn-primary btn-sm" style="flex:2" onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
+    '<button id="btnConfirmarLancs" class="btn btn-primary btn-sm" style="flex:2;' + (algumaSemData ? 'opacity:0.45;cursor:not-allowed;' : '') + '" ' + (algumaSemData ? 'disabled' : '') + ' onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
     '</div></div></div>';
   msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+
+function verificarDatasPreenchidas() {
+  const card = document.getElementById('confirmCard');
+  const btn = document.getElementById('btnConfirmarLancs');
+  if (!card || !btn) return;
+  const totalGrupos = parseInt(card.dataset.totalGrupos || '0');
+  let allFilled = true;
+  for (let gi = 0; gi < totalGrupos; gi++) {
+    const inp = document.getElementById('ccData-' + gi);
+    if (inp && !inp.value) { allFilled = false; break; }
+  }
+  btn.disabled = !allFilled;
+  btn.style.opacity = allFilled ? '1' : '0.45';
+  btn.style.cursor = allFilled ? 'pointer' : 'not-allowed';
+  // Remove borda vermelha dos inputs que foram preenchidos
+  for (let gi = 0; gi < totalGrupos; gi++) {
+    const inp = document.getElementById('ccData-' + gi);
+    if (inp && inp.value) inp.style.border = '1px solid var(--border2)';
+  }
 }
 
 
@@ -2520,7 +2648,7 @@ async function processarNFEmpresa(files) {
       const m = COMPANIES_META[ecKey];
 
       if (stEl) stEl.textContent = 'lendo IA...';
-      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. Responda SOMENTE JSON sem markdown: {"fornecedor":"","data":"DD/MM/AAAA","nf_numero":"","itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
+      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. IMPORTANTE: extraia a data da nota fiscal como campo "_dataNF" no formato YYYY-MM-DD (ex: "2026-03-15"). Se a data nao estiver legivel ou nao for encontrada, retorne "_dataNF": null — NUNCA invente ou assuma a data de hoje. Responda SOMENTE JSON sem markdown: {"fornecedor":"","data":"DD/MM/AAAA","nf_numero":"","_dataNF":"YYYY-MM-DD","itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
 
       const mc = file.type === 'application/pdf'
         ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
@@ -2530,7 +2658,7 @@ async function processarNFEmpresa(files) {
       const resIA = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body: JSON.stringify({model:'claude-opus-4-6',max_tokens:2000,messages:[{role:'user',content:mc}]})
+        body: JSON.stringify({model:'claude-sonnet-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:mc}]})
       }).then(r => r.json());
 
       if (resIA.content?.[0]) {
@@ -2553,16 +2681,19 @@ async function processarNFEmpresa(files) {
     const { parsed, preview, fileName } = res;
     const fileIndex = filePreviews.length;
     filePreviews.push(preview);
-    let dataNFInput = '';
-    if (parsed.data) {
+    // Prioriza o campo _dataNF (YYYY-MM-DD); fallback para data DD/MM/AAAA; null se ausente
+    let dataNFInput = null;
+    if (parsed._dataNF) {
+      dataNFInput = parsed._dataNF; // já em YYYY-MM-DD
+    } else if (parsed.data) {
       const pts = parsed.data.split('/');
-      if (pts.length === 3) dataNFInput = pts[2] + '-' + pts[1] + '-' + pts[0];
+      if (pts.length === 3 && pts[2].length === 4) dataNFInput = pts[2] + '-' + pts[1].padStart(2,'0') + '-' + pts[0].padStart(2,'0');
     }
     allItens = allItens.concat((parsed.itens || []).map(it => ({
       ...it,
       _nota: fileName,
       _notaIdx: fileIndex,
-      _dataNF: dataNFInput || new Date().toISOString().split('T')[0],
+      _dataNF: dataNFInput, // null se não encontrado
       _fornecedor: parsed.fornecedor || ''
     })));
     if (!fornFinal && parsed.fornecedor) fornFinal = parsed.fornecedor;
