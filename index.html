@@ -552,6 +552,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
           <input type="date" class="filter-select" id="filterAte" oninput="renderLancamentos()" style="padding:6px 10px;">
           <button class="btn btn-ghost btn-sm" onclick="limparFiltroPeriodo()">Limpar</button>
         </div>
+        <div style="position:relative;display:flex;align-items:center;">
+          <input type="text" class="filter-select" id="filterBusca"
+            placeholder="Buscar descrição ou fornecedor..."
+            oninput="renderLancamentos()"
+            style="padding-right:28px;min-width:220px;">
+          <button id="btnLimparBusca" onclick="limparBusca()"
+            style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;display:none;line-height:1;"
+            title="Limpar busca">✕</button>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openModal('modalLancamento')">+ Novo lançamento</button>
     </div>
@@ -619,6 +628,14 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
           </div>
         </div>
         <p style="font-size:12px;color:var(--text3);margin-top:12px;">Necessária para usar o Assistente IA. Salva localmente no seu navegador.</p>
+      </div>
+      <div class="settings-card" style="grid-column:1/-1">
+        <div class="settings-card-title">Manutenção de Dados</div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px;">Audita todas as planilhas de Lançamentos, detecta IDs duplicados e corrige automaticamente renumerando a partir do maior ID único existente.</p>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" id="btnAuditarIds" onclick="executarAuditoria()">🔍 Auditar e corrigir IDs duplicados</button>
+          <span id="auditoriaStatus" style="font-size:12px;color:var(--text3);"></span>
+        </div>
       </div>
       <div class="settings-card" style="grid-column:1/-1">
         <div class="settings-card-title">Empresas Cadastradas</div>
@@ -1250,6 +1267,17 @@ async function renderLancamentos() {
 
   if (catFilter) all = all.filter(r => r['Categoria'] === catFilter);
 
+  // Filtro de busca por texto (descrição / fornecedor)
+  const busca = (document.getElementById('filterBusca')?.value || '').toLowerCase().trim();
+  const btnX = document.getElementById('btnLimparBusca');
+  if (btnX) btnX.style.display = busca ? 'block' : 'none';
+  if (busca) {
+    all = all.filter(r =>
+      (r['Descrição'] || '').toLowerCase().includes(busca) ||
+      (r['Fornecedor'] || '').toLowerCase().includes(busca)
+    );
+  }
+
   // Filtro de período De/Até (frontend, sem nova chamada à API)
   const filterDe = document.getElementById('filterDe')?.value;
   const filterAte = document.getElementById('filterAte')?.value;
@@ -1314,6 +1342,45 @@ function limparFiltroPeriodo() {
   document.getElementById('filterDe').value = '';
   document.getElementById('filterAte').value = '';
   renderLancamentos();
+}
+
+function limparBusca() {
+  document.getElementById('filterBusca').value = '';
+  document.getElementById('btnLimparBusca').style.display = 'none';
+  renderLancamentos();
+}
+
+async function executarAuditoria() {
+  const btn = document.getElementById('btnAuditarIds');
+  const status = document.getElementById('auditoriaStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Auditando...';
+  status.textContent = '';
+  try {
+    const r = await postAPI({ action: 'auditarIds' });
+    if (r.status === 'ok') {
+      const n = r.totalCorrigidos || 0;
+      const msg = n === 0
+        ? '✓ Nenhum ID duplicado encontrado.'
+        : `✓ ${n} ID${n > 1 ? 's' : ''} duplicado${n > 1 ? 's' : ''} corrigido${n > 1 ? 's' : ''}.`;
+      showToast(msg);
+      status.textContent = msg;
+      status.style.color = n === 0 ? 'var(--green)' : 'var(--yellow)';
+      if (n > 0) lancamentosCache = {}; // invalida cache após correção
+    } else {
+      const msg = '✗ Erro: ' + (r.message || 'falha');
+      showToast(msg);
+      status.textContent = msg;
+      status.style.color = 'var(--red)';
+    }
+  } catch(e) {
+    showToast('Erro de conexão');
+    status.textContent = '✗ Erro de conexão';
+    status.style.color = 'var(--red)';
+  }
+  btn.disabled = false;
+  btn.textContent = '🔍 Auditar e corrigir IDs duplicados';
+  setTimeout(() => { if (status) status.textContent = ''; }, 8000);
 }
 
 async function deletarLancamento(id, empresa, descricao) {
