@@ -175,6 +175,14 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .data-cell:hover { color: var(--gold); }
 .data-cell:hover::after { content: ' ✏️'; font-size: 10px; opacity: 0.6; }
 
+/* CÉLULAS EDITÁVEIS INLINE */
+.inline-edit:hover { color: var(--gold); cursor: pointer; }
+.inline-edit:hover::after { content: ' ✏️'; font-size: 10px; opacity: 0.6; }
+
+/* FILTRO PERÍODO */
+.period-filter-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.period-filter-wrap label { font-size: 12px; color: var(--text3); }
+
 /* RESUMO DO DIA */
 .resumo-dia-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 32px; display: flex; align-items: center; gap: 16px; font-size: 12.5px; flex-wrap: wrap; }
 .resumo-dia-label { font-weight: 600; color: var(--gold); margin-right: 4px; }
@@ -537,6 +545,13 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
           <option value="Desp. Operacionais">Desp. Operacionais</option>
           <option value="Despesas Fixas">Despesas Fixas</option>
         </select>
+        <div class="period-filter-wrap">
+          <label>De:</label>
+          <input type="date" class="filter-select" id="filterDe" oninput="renderLancamentos()" style="padding:6px 10px;">
+          <label>Até:</label>
+          <input type="date" class="filter-select" id="filterAte" oninput="renderLancamentos()" style="padding:6px 10px;">
+          <button class="btn btn-ghost btn-sm" onclick="limparFiltroPeriodo()">Limpar</button>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openModal('modalLancamento')">+ Novo lançamento</button>
     </div>
@@ -1234,6 +1249,21 @@ async function renderLancamentos() {
   }
 
   if (catFilter) all = all.filter(r => r['Categoria'] === catFilter);
+
+  // Filtro de período De/Até (frontend, sem nova chamada à API)
+  const filterDe = document.getElementById('filterDe')?.value;
+  const filterAte = document.getElementById('filterAte')?.value;
+  if (filterDe || filterAte) {
+    all = all.filter(r => {
+      const d = r['Data'] || '';
+      let iso = d;
+      if (d.includes('/')) { const [dd,mm,yyyy] = d.split('/'); iso = `${yyyy}-${mm}-${dd}`; }
+      if (filterDe && iso < filterDe) return false;
+      if (filterAte && iso > filterAte) return false;
+      return true;
+    });
+  }
+
   all.sort((a, b) => new Date(b['Data']) - new Date(a['Data']));
 
   if (all.length === 0) {
@@ -1254,25 +1284,142 @@ async function renderLancamentos() {
       if (d.includes('/')) { const [dd,mm,yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; }
       return d;
     })();
+    const desc = (r['Descrição'] || '—').replace(/'/g, '&apos;').replace(/"/g, '&quot;');
+    const forn = (r['Fornecedor'] || '—').replace(/'/g, '&apos;').replace(/"/g, '&quot;');
     return `<tr>
       <td class="data-cell" onclick="editarDataInline(this,'${id}','${r._empresa}','${dataISO}')" title="Clique para editar a data" style="cursor:pointer;white-space:nowrap">${formatDate(r['Data'])}</td>
       <td>${COMPANIES_META[r._empresa]?.name || r._empresa}</td>
-      <td><span class="cat-pill ${catClass}">${cat}</span></td>
-      <td>${r['Descrição'] || '—'}</td>
-      <td>${r['Fornecedor'] || '—'}</td>
-      <td style="text-align:right" class="${valClass}">${formatCurrency(valor)}</td>
-      <td style="text-align:center">
-        <button onclick="abrirEdicaoLancamento('${id}','${r._empresa}','${dataISO}','${cat}','${(r['Descrição']||'').replace(/'/g,'&apos;')}','${(r['Fornecedor']||'').replace(/'/g,'&apos;')}',${valor})"
-          style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 6px;border-radius:4px;"
+      <td class="inline-edit" onclick="iniciarEdicaoInline(this,'${id}','${r._empresa}','Categoria','${cat.replace(/'/g,"&apos;")}','select')" title="Clique para editar"><span class="cat-pill ${catClass}">${cat}</span></td>
+      <td class="inline-edit" onclick="iniciarEdicaoInline(this,'${id}','${r._empresa}','Descrição','${desc}','text')" title="Clique para editar">${r['Descrição'] || '—'}</td>
+      <td class="inline-edit" onclick="iniciarEdicaoInline(this,'${id}','${r._empresa}','Fornecedor','${forn}','text')" title="Clique para editar">${r['Fornecedor'] || '—'}</td>
+      <td class="inline-edit" style="text-align:right" onclick="iniciarEdicaoInline(this,'${id}','${r._empresa}','Valor (R$)',${valor},'number')" title="Clique para editar"><span class="${valClass}">${formatCurrency(valor)}</span></td>
+      <td style="text-align:center;white-space:nowrap">
+        <button onclick="abrirEdicaoLancamento('${id}','${r._empresa}','${dataISO}','${cat.replace(/'/g,"&apos;")}','${desc}','${forn}',${valor})"
+          style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 4px;border-radius:4px;"
           title="Editar lançamento">✏️</button>
+        <button onclick="deletarLancamento('${id}','${r._empresa}','${desc}')"
+          style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:2px 4px;border-radius:4px;"
+          title="Excluir lançamento">🗑️</button>
       </td>
     </tr>`;
   }).join('');
 }
 
 function filtrarLancamentos() {
-  lancamentosCache = {}; // força recarregar ao filtrar
+  lancamentosCache = {}; // força recarregar ao filtrar empresa/categoria
   renderLancamentos();
+}
+
+function limparFiltroPeriodo() {
+  document.getElementById('filterDe').value = '';
+  document.getElementById('filterAte').value = '';
+  renderLancamentos();
+}
+
+async function deletarLancamento(id, empresa, descricao) {
+  const confirmMsg = `Excluir lançamento #${id}?\n"${descricao}"\n\nEssa ação não pode ser desfeita.`;
+  if (!confirm(confirmMsg)) return;
+
+  showToast('Excluindo...');
+  try {
+    const r = await postAPI({ action: 'deletarLancamento', empresa, id: parseInt(id) });
+    if (r.status === 'ok') {
+      lancamentosCache[empresa] = null;
+      showToast('✓ Lançamento excluído!');
+      await renderLancamentos();
+    } else {
+      showToast('Erro: ' + (r.message || 'falha'));
+    }
+  } catch(e) {
+    showToast('Erro de conexão');
+  }
+}
+
+const CATEGORIAS_INLINE = ['Receita Bruta','CMV','Custo com Pessoal','Embalagens','Higiene e Limpeza','Consumo Interno','Marketing / Patrocínio','Despesas Operacionais','Despesas Fixas','Despesas Diversas','Manutenção'];
+
+function iniciarEdicaoInline(td, id, empresa, campo, valorAtual, tipo) {
+  if (td.querySelector('input,select')) return; // já editando
+  const conteudoOriginal = td.innerHTML;
+  const displayOriginal = td.textContent.trim();
+  td.innerHTML = '';
+
+  let input;
+  if (tipo === 'select') {
+    input = document.createElement('select');
+    input.style.cssText = 'width:160px;background:var(--surface);border:1px solid var(--gold);border-radius:6px;padding:3px 6px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+    CATEGORIAS_INLINE.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      if (c === valorAtual) opt.selected = true;
+      input.appendChild(opt);
+    });
+  } else if (tipo === 'number') {
+    input = document.createElement('input');
+    input.type = 'number'; input.step = '0.01';
+    input.value = valorAtual;
+    input.style.cssText = 'width:110px;background:var(--surface);border:1px solid var(--gold);border-radius:6px;padding:3px 6px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;text-align:right;';
+  } else {
+    input = document.createElement('input');
+    input.type = 'text';
+    input.value = valorAtual === '—' ? '' : valorAtual;
+    input.style.cssText = 'width:150px;background:var(--surface);border:1px solid var(--gold);border-radius:6px;padding:3px 6px;font-size:12px;color:var(--text);font-family:DM Sans,sans-serif;outline:none;';
+  }
+  td.appendChild(input);
+  input.focus();
+  if (tipo !== 'select') input.select?.();
+
+  async function salvar() {
+    const novoValor = tipo === 'number' ? parseFloat(input.value) : input.value.trim();
+    const novoDisplay = tipo === 'number' ? input.value : input.value.trim();
+    if (String(novoValor) === String(valorAtual) || (tipo !== 'number' && novoValor === '')) {
+      td.innerHTML = conteudoOriginal; return;
+    }
+    td.innerHTML = '<span style="color:var(--text3);font-size:11px">Salvando...</span>';
+    try {
+      const lancs = await loadLancamentos(empresa);
+      const lanc = lancs.find(l => String(l['ID']) === String(id));
+      if (!lanc) { td.innerHTML = conteudoOriginal; showToast('Lançamento não encontrado'); return; }
+      const d = lanc['Data'] || '';
+      let iso = d;
+      if (d.includes('/')) { const [dd,mm,yy] = d.split('/'); iso = `${yy}-${mm}-${dd}`; }
+      const [yyyy, mm, dd] = iso.split('-');
+      const dataFmt = `${dd}/${mm}/${yyyy}`;
+
+      const campoAtualizado = {};
+      campoAtualizado[campo] = novoValor;
+
+      const r = await postAPI({
+        action: 'editarLancamento',
+        empresa, id: parseInt(id),
+        lancamento: {
+          data: dataFmt,
+          categoria: campo === 'Categoria' ? novoValor : lanc['Categoria'],
+          descricao: campo === 'Descrição' ? novoValor : lanc['Descrição'],
+          fornecedor: campo === 'Fornecedor' ? (novoValor || '—') : (lanc['Fornecedor'] || '—'),
+          valor: campo === 'Valor (R$)' ? novoValor : (parseFloat(lanc['Valor (R$)']) || 0),
+          mes: parseInt(mm), ano: parseInt(yyyy)
+        }
+      });
+
+      if (r.status === 'ok') {
+        lancamentosCache[empresa] = null;
+        showToast('✓ ' + campo + ' atualizado!');
+        await renderLancamentos();
+      } else {
+        td.innerHTML = conteudoOriginal;
+        showToast('Erro: ' + (r.message || 'falha'));
+      }
+    } catch(e) {
+      td.innerHTML = conteudoOriginal;
+      showToast('Erro de conexão');
+    }
+  }
+
+  input.addEventListener('blur', salvar);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { td.innerHTML = conteudoOriginal; }
+  });
 }
 
 function editarDataInline(td, id, empresa, dataISO) {
