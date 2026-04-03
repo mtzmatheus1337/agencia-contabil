@@ -705,16 +705,16 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
         </div>
       </div>
       <div class="settings-card">
-        <div class="settings-card-title">Chave API Anthropic</div>
+        <div class="settings-card-title">Chave API Anthropic (IA)</div>
+        <div class="alert alert-ok" id="anthropicKeyStatus" style="font-size:12px;">A chave é salva no servidor (Apps Script) — nunca exposta ao navegador.</div>
         <div class="form-group">
-          <label class="form-label">Chave de API (Assistente IA)</label>
+          <label class="form-label">Chave de API — configurar no servidor</label>
           <div class="api-key-wrap">
-            <input type="password" class="form-input" id="anthropicKey" placeholder="sk-ant-...">
-            <button class="btn btn-primary btn-sm" onclick="salvarAnthropicKey()">Salvar</button>
+            <input type="password" class="form-input" id="anthropicKeyInput" placeholder="sk-ant-...">
+            <button class="btn btn-primary btn-sm" onclick="salvarAnthropicKey()">Salvar no servidor</button>
           </div>
         </div>
-        <p style="font-size:12px;color:var(--text3);margin-top:12px;">Necessária para usar o Assistente IA. Salva localmente no seu navegador.</p>
-        <div class="alert alert-warn" style="margin-top:14px;font-size:12px;">⚠ Atenção: a chave API fica armazenada localmente neste navegador. Não use em dispositivos compartilhados.</div>
+        <p style="font-size:12px;color:var(--text3);margin-top:12px;">A chave é armazenada nas PropertiesService do Apps Script. Basta configurar uma vez — todos os dispositivos a utilizam automaticamente.</p>
       </div>
       <div class="settings-card">
         <div class="settings-card-title">Segurança</div>
@@ -918,7 +918,6 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 // CONFIGURAÇÃO
 // ============================================================
 const API_URL_KEY = 'agencia_api_url';
-const ANTHROPIC_KEY_STORAGE = 'agencia_anthropic_key';
 
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbww1db3RzmQTzwfdGm8BRLJ9SlWGnhYj3K0aKFmBdOrGJd7tL6DXQJWFgJgjnkd5y-j/exec';
 
@@ -931,7 +930,6 @@ const COMPANIES_META = {
 };
 
 let apiUrl = localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
-let apiKey = localStorage.getItem(ANTHROPIC_KEY_STORAGE) || '';
 let consolidadoCache = null;
 let lancamentosCache = {};
 let currentDREEmpresa = 'containers';
@@ -974,9 +972,6 @@ function inicializarSistema() {
   if (localStorage.getItem(API_URL_KEY)) {
     document.getElementById('sheetsApiUrl').value = apiUrl;
   }
-  if (apiKey) {
-    document.getElementById('anthropicKey').value = apiKey;
-  }
   const mes = new Date().toLocaleString('pt-BR', {month:'long', year:'numeric'});
   document.getElementById('periodoAtual').textContent = mes.charAt(0).toUpperCase() + mes.slice(1);
   pingAPI();
@@ -1012,6 +1007,13 @@ async function postAPI(body) {
   });
   return await res.json();
 }
+
+// Proxy server-side para Anthropic — chave nunca vai ao frontend
+async function postAnthropic(payload) {
+  return await postAPI({ action: 'proxyAnthropic', ...payload });
+}
+
+let fornecedoresCache = null; // item 4
 
 async function pingAPI() {
   try {
@@ -1445,6 +1447,76 @@ function renderGraficosDRE(empresaKey) {
   makeChart('chartReceita', receitas, '#1e7a4a', 'brl');
   makeChart('chartCMV',     cmvPcts,  '#b83232', 'pct', 40);
   makeChart('chartEBITDA',  ebitdas,  '#8a5f28', 'brl');
+}
+
+// ============================================================
+// HISTÓRICO DE FORNECEDORES COM SUGESTÃO AUTOMÁTICA (item 4)
+// ============================================================
+async function loadFornecedores() {
+  if (fornecedoresCache) return fornecedoresCache;
+  try {
+    const r = await callAPI({ action: 'getFornecedores' });
+    if (r.status === 'ok') { fornecedoresCache = r.data; return r.data; }
+  } catch(e) {}
+  return [];
+}
+
+function attachFornecedorAutocomplete(input) {
+  if (!input || input._acAttached) return;
+  input._acAttached = true;
+  let dropdown = null;
+
+  function removeDropdown() {
+    if (dropdown) { dropdown.remove(); dropdown = null; }
+  }
+
+  input.addEventListener('input', async () => {
+    removeDropdown();
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) return;
+    const lista = await loadFornecedores();
+    const matches = lista.filter(f => f.nome.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) return;
+
+    dropdown = document.createElement('div');
+    dropdown.style.cssText = 'position:absolute;z-index:500;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:260px;max-height:220px;overflow-y:auto;';
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top  = (rect.bottom + window.scrollY) + 'px';
+    dropdown.style.left = rect.left + 'px';
+
+    matches.forEach(f => {
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border);';
+      item.innerHTML = '<div style="font-weight:500;color:var(--text)">' + f.nome + '</div>' +
+        '<div style="font-size:10.5px;color:var(--text3);margin-top:1px">' +
+        (f.cnpj ? f.cnpj + ' · ' : '') +
+        (f.ultimaCategoria || '') +
+        ' · ' + f.frequencia + 'x</div>';
+      item.addEventListener('mousedown', e => {
+        e.preventDefault();
+        input.value = f.nome;
+        input.dispatchEvent(new Event('change'));
+        removeDropdown();
+      });
+      item.addEventListener('mouseover', () => item.style.background = 'var(--surface2)');
+      item.addEventListener('mouseout',  () => item.style.background = '');
+      dropdown.appendChild(item);
+    });
+
+    document.body.appendChild(dropdown);
+  });
+
+  input.addEventListener('blur', () => setTimeout(removeDropdown, 150));
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') removeDropdown(); });
+}
+
+// Ativa autocomplete nos inputs de fornecedor do card de confirmação
+function ativarAutocompleteFornecedores() {
+  ['ccForn'].forEach(prefix => {
+    document.querySelectorAll('[id^="' + prefix + '"]').forEach(attachFornecedorAutocomplete);
+  });
+  // também nos inputs de fornecedor individual dos itens
+  document.querySelectorAll('[id^="ccforn-"]').forEach(attachFornecedorAutocomplete);
 }
 
 // ============================================================
@@ -2042,12 +2114,6 @@ async function sendChat() {
   const msg = input.value.trim();
   if (!msg) return;
 
-  if (!apiKey) {
-    appendChatMsg('ai', 'Para usar o assistente, configure sua chave de API da Anthropic em Configurações.');
-    showPage('settings');
-    return;
-  }
-
   input.value = '';
   input.style.height = 'auto';
   document.getElementById('chatSuggestions').style.display = 'none';
@@ -2087,12 +2153,8 @@ async function sendChat() {
   msgs.appendChild(typing); msgs.scrollTop = msgs.scrollHeight;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 800, system: chatSystemPrompt || buildSystemPrompt(), messages: chatHistory.slice(-10) })
-    });
-    const data = await res.json();
+    const proxy = await postAnthropic({ model: 'claude-haiku-4-5-20251001', max_tokens: 800, system: chatSystemPrompt || buildSystemPrompt(), messages: chatHistory.slice(-10) });
+    const data = proxy.status === 'ok' ? proxy.data : { error: { message: proxy.message || 'Erro no servidor' } };
     document.getElementById('typingIndicator')?.remove();
     chatTyping = false; document.getElementById('chatSendBtn').disabled = false;
     if (data.content?.[0]) {
@@ -2110,7 +2172,6 @@ async function sendChat() {
 }
 
 async function gerarAnalise() {
-  if (!apiKey) { showPage('settings'); showToast('Configure sua chave API primeiro'); return; }
   showPage('chat');
   document.getElementById('chatInput').value = 'Gere um relatório executivo completo do portfólio com análise de CMV, margens e principais alertas.';
   sendChat();
@@ -2128,12 +2189,27 @@ function salvarApiUrl() {
   pingAPI();
 }
 
-function salvarAnthropicKey() {
-  const key = document.getElementById('anthropicKey').value.trim();
-  if (!key) return;
-  localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
-  apiKey = key;
-  showToast('✓ Chave API salva!');
+async function salvarAnthropicKey() {
+  const key = document.getElementById('anthropicKeyInput').value.trim();
+  if (!key || !key.startsWith('sk-')) { showToast('Chave inválida — deve começar com sk-'); return; }
+  const statusEl = document.getElementById('anthropicKeyStatus');
+  statusEl.textContent = 'Salvando no servidor...';
+  statusEl.className = 'alert alert-info';
+  try {
+    const r = await postAPI({ action: 'salvarAnthropicKey', key });
+    if (r.status === 'ok') {
+      document.getElementById('anthropicKeyInput').value = '';
+      statusEl.textContent = '✓ Chave salva no servidor com sucesso!';
+      statusEl.className = 'alert alert-ok';
+      showToast('✓ Chave Anthropic salva no servidor!');
+    } else {
+      statusEl.textContent = '✗ Erro: ' + (r.message || 'falha');
+      statusEl.className = 'alert alert-warn';
+    }
+  } catch(e) {
+    statusEl.textContent = '✗ Erro de conexão';
+    statusEl.className = 'alert alert-warn';
+  }
 }
 
 // ============================================================
@@ -2341,11 +2417,11 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
   const hoje = new Date().toISOString().split('T')[0];
   const total = ecPending.reduce((s, i) => s + (i.valor||0), 0);
 
-  // Agrupa itens por índice de arquivo (_notaIdx)
+  // Agrupa por CNPJ quando disponível; senão por _notaIdx (item 3)
   const gruposOrdem = [];
   const gruposMap = {};
   ecPending.forEach(it => {
-    const key = it._notaIdx !== undefined ? String(it._notaIdx) : (it._nota || '_sem_nota');
+    const key = it._cnpj ? ('cnpj_' + it._cnpj) : (it._notaIdx !== undefined ? String(it._notaIdx) : (it._nota || '_sem_nota'));
     if (!gruposMap[key]) { gruposMap[key] = []; gruposOrdem.push(key); }
     gruposMap[key].push(it);
   });
@@ -2360,11 +2436,19 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
     const isImg = preview && (preview.mimeType === 'image/jpeg' || preview.mimeType === 'image/png' || preview.mimeType === 'image/gif' || preview.mimeType === 'image/webp');
     const isPdf = preview && preview.mimeType === 'application/pdf';
 
-    // Data e fornecedor individuais por nota — pega do primeiro item do grupo
+    // Data, fornecedor e CNPJ por grupo — pega do primeiro item
     const primeiroItem = itensGrupo[0];
     // _dataNF é null quando a data não foi encontrada na nota — NÃO faz fallback para hoje
     const dataGrupo = primeiroItem?._dataNF ?? null;
     const fornGrupo = primeiroItem?._fornecedor || primeiroItem?.fornecedor || '';
+    const cnpjGrupo = primeiroItem?._cnpj || null;
+    const totalNFGrupo = primeiroItem?._totalNF ?? null;
+
+    // Alerta de soma (item 2)
+    const somaItensGrupo = itensGrupo.reduce((s, it) => s + (it.valor || 0), 0);
+    const alertaSomaHtml = (totalNFGrupo !== null && Math.abs(somaItensGrupo - totalNFGrupo) > 0.50)
+      ? '<div style="background:rgba(160,112,16,0.10);border:1px solid rgba(160,112,16,0.4);border-radius:6px;padding:8px 12px;margin:6px 14px;font-size:12px;color:var(--yellow)">⚠️ Soma dos itens (' + formatCurrency(somaItensGrupo) + ') difere do total da nota (' + formatCurrency(totalNFGrupo) + ') — verifique antes de confirmar</div>'
+      : '';
 
     let previewHtml = '';
     if (preview) {
@@ -2375,15 +2459,18 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
       } else if (isPdf) {
         imgHtml = '<div class="nota-preview-pdf">📋 PDF — <a href="' + dataUrl + '" target="_blank">Abrir em nova aba ↗</a></div>';
       }
+      // CNPJ ao lado do nome do arquivo no cabeçalho (item 3)
+      const cnpjBadge = cnpjGrupo ? '<span style="font-size:10px;color:var(--blue);background:rgba(45,95,160,.1);border-radius:8px;padding:1px 6px;margin-left:6px">' + cnpjGrupo + '</span>' : '';
       previewHtml = '<div class="nota-preview-wrap">' +
         '<div class="nota-preview-header">' +
-        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">📄 ' + nomeArq + '</span>' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px;display:flex;align-items:center;gap:4px">📄 ' + nomeArq + cnpjBadge + '</span>' +
         '<button class="nota-preview-toggle" id="npbtn-' + gi + '" onclick="toggleNotaPreview(' + gi + ')">▼ Ver nota</button>' +
         '</div>' +
         '<div class="nota-preview-img-wrap" id="npwrap-' + gi + '">' + imgHtml + '</div>' +
         '</div>';
     } else {
-      previewHtml = '<div style="padding:6px 14px;font-size:11px;color:var(--text3);border-bottom:1px solid var(--border)">📄 ' + nomeArq + '</div>';
+      const cnpjBadge = cnpjGrupo ? '<span style="font-size:10px;color:var(--blue);background:rgba(45,95,160,.1);border-radius:8px;padding:1px 6px;margin-left:6px">' + cnpjGrupo + '</span>' : '';
+      previewHtml = '<div style="padding:6px 14px;font-size:11px;color:var(--text3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px">📄 ' + nomeArq + cnpjBadge + '</div>';
     }
 
     // Campos de data e fornecedor individuais por nota
@@ -2435,7 +2522,7 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
         '</div></div>';
     }).join('');
 
-    gruposHtml += '<div style="border-bottom:2px solid var(--border2)">' + previewHtml + camposNota + iHtml + '</div>';
+    gruposHtml += '<div style="border-bottom:2px solid var(--border2)">' + previewHtml + camposNota + alertaSomaHtml + iHtml + '</div>';
   });
 
   const div = document.createElement('div');
@@ -2457,6 +2544,8 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
     '<button id="btnConfirmarLancs" class="btn btn-primary btn-sm" style="flex:2;' + (algumaSemData ? 'opacity:0.45;cursor:not-allowed;' : '') + '" ' + (algumaSemData ? 'disabled' : '') + ' onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
     '</div></div></div>';
   msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+  // Ativa autocomplete de fornecedores nos inputs do card (item 4)
+  ativarAutocompleteFornecedores();
 }
 
 function verificarDatasPreenchidas() {
@@ -2529,6 +2618,7 @@ function ecShowConfirm(itens, fornecedor, dataStr) {
     '<button class="btn btn-primary btn-sm" style="flex:2" onclick="confirmarLancs()">✓ Confirmar e salvar</button>' +
     '</div></div></div>';
   msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+  ativarAutocompleteFornecedores();
 }
 
 async function confirmarLancs() {
@@ -2661,7 +2751,6 @@ function exportarLog() {
 // ============================================================
 async function processarNFEmpresa(files) {
   if (!files?.length) return;
-  if (!apiKey) { showToast('Configure a chave API em Configurações'); return; }
 
   const fl = Array.from(files);
   ecAppendMsg('ai', '📄 Recebendo ' + fl.length + ' arquivo(s)... Analisando com IA e salvando no Drive.');
@@ -2700,26 +2789,22 @@ async function processarNFEmpresa(files) {
       const m = COMPANIES_META[ecKey];
 
       if (stEl) stEl.textContent = 'lendo IA...';
-      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. IMPORTANTE: extraia a data da nota fiscal como campo "_dataNF" no formato YYYY-MM-DD (ex: "2026-03-15"). Se a data nao estiver legivel ou nao for encontrada, retorne "_dataNF": null — NUNCA invente ou assuma a data de hoje. Responda SOMENTE JSON sem markdown: {"fornecedor":"","data":"DD/MM/AAAA","nf_numero":"","_dataNF":"YYYY-MM-DD","itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
+      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. IMPORTANTE: (1) extraia a data da nota fiscal como campo "_dataNF" no formato YYYY-MM-DD (ex: "2026-03-15") — se nao encontrada retorne "_dataNF": null, NUNCA invente a data; (2) extraia o CNPJ do emitente como "_cnpj" no formato "XX.XXX.XXX/XXXX-XX" — se nao encontrado retorne "_cnpj": null; (3) extraia o valor total da nota (subtotal ou total geral) como "_totalNF" (numero, ex: 1234.56) — se nao encontrado retorne "_totalNF": null. Responda SOMENTE JSON sem markdown: {"fornecedor":"","_cnpj":"XX.XXX.XXX/XXXX-XX","data":"DD/MM/AAAA","nf_numero":"","_dataNF":"YYYY-MM-DD","_totalNF":0.00,"itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
 
       const mc = file.type === 'application/pdf'
         ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
         : [{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:prompt}];
 
       // Apenas IA em paralelo — Drive será feito depois, um por vez
-      const resIA = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body: JSON.stringify({model:'claude-sonnet-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:mc}]})
-      }).then(r => r.json());
+      const proxyIA = await postAnthropic({model:'claude-sonnet-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:mc}]});
 
-      if (resIA.content?.[0]) {
-        const parsed = JSON.parse(resIA.content[0].text.replace(/```json|```/g,'').trim());
+      if (proxyIA.status === 'ok' && proxyIA.data?.content?.[0]) {
+        const parsed = JSON.parse(proxyIA.data.content[0].text.replace(/```json|```/g,'').trim());
         const preview = { name: file.name, b64, mimeType: mt };
         if (icEl) icEl.textContent = '✅';
         if (stEl) stEl.textContent = (parsed.itens?.length||0) + ' itens · Drive pendente...';
         return { ok: true, parsed, preview, b64, mt, fileName: file.name, stEl, icEl };
-      } else throw new Error('sem resposta IA');
+      } else throw new Error(proxyIA.message || 'sem resposta IA');
     } catch(e) {
       if (icEl) icEl.textContent = '❌';
       if (stEl) stEl.textContent = 'erro';
@@ -2746,7 +2831,9 @@ async function processarNFEmpresa(files) {
       _nota: fileName,
       _notaIdx: fileIndex,
       _dataNF: dataNFInput, // null se não encontrado
-      _fornecedor: parsed.fornecedor || ''
+      _fornecedor: parsed.fornecedor || '',
+      _cnpj: parsed._cnpj || null,
+      _totalNF: parsed._totalNF || null,
     })));
     if (!fornFinal && parsed.fornecedor) fornFinal = parsed.fornecedor;
     if (!dataNF && parsed.data) dataNF = parsed.data;
@@ -3050,7 +3137,6 @@ async function enviarMsgEmpresa() {
   const inp = document.getElementById('ecInput');
   const msg = inp.value.trim();
   if (!msg) return;
-  if (!apiKey) { showToast('Configure a chave API em Configurações'); showPage('settings'); return; }
 
   inp.value = ''; inp.style.height = 'auto';
   ecAppendMsg('user', msg);
@@ -3081,12 +3167,8 @@ async function enviarMsgEmpresa() {
     'REGRAS: seja direto e conciso; use R$ formatado; responda em pt-BR; se receber só um valor sem contexto, pergunte se é receita ou despesa.';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,system,messages:ecHistory.slice(-12)})
-    });
-    const d = await res.json();
+    const proxy = await postAnthropic({model:'claude-haiku-4-5-20251001',max_tokens:600,system,messages:ecHistory.slice(-12)});
+    const d = proxy.status === 'ok' ? proxy.data : { error: { message: proxy.message || 'Erro no servidor' } };
     document.getElementById('ecTyping')?.remove();
     ecTyping = false; document.getElementById('ecSendBtn').disabled = false;
 
