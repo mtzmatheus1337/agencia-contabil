@@ -288,6 +288,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .period-label { font-size: 12px; color: var(--text3); }
 .period-value { font-size: 13px; font-weight: 500; color: var(--gold); }
 
+/* LOGIN */
+#loginOverlay { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: none; align-items: center; justify-content: center; }
+#loginOverlay.show { display: flex; }
+.login-card { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 44px 40px 36px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 12px 48px rgba(0,0,0,0.10); }
+.login-logo { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--gold); line-height: 1.2; margin-bottom: 5px; }
+.login-sub { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 36px; }
+.login-field { text-align: left; margin-bottom: 16px; }
+.login-error { font-size: 13px; color: var(--red); margin-top: 14px; min-height: 18px; }
+
 /* TOAST */
 #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface3); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 12px 18px; font-size: 13px; color: var(--text); z-index: 999; transform: translateY(20px); opacity: 0; transition: all 0.3s; max-width: 320px; }
 #toast.show { transform: translateY(0); opacity: 1; }
@@ -395,6 +404,22 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 </style>
 </head>
 <body>
+
+<!-- TELA DE LOGIN -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">Agência Contábil</div>
+    <div class="login-sub">Matheus Saldanha Garcia</div>
+    <div class="login-field">
+      <label class="form-label">Senha de acesso</label>
+      <input type="password" class="form-input" id="loginSenha" placeholder="••••••••" style="width:100%;margin-top:6px;"
+        onkeydown="if(event.key==='Enter')tentarLogin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="tentarLogin()">Entrar</button>
+    <div class="login-error" id="loginErro"></div>
+  </div>
+</div>
+
 <div class="app">
 
 <!-- SIDEBAR -->
@@ -628,6 +653,18 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
           </div>
         </div>
         <p style="font-size:12px;color:var(--text3);margin-top:12px;">Necessária para usar o Assistente IA. Salva localmente no seu navegador.</p>
+        <div class="alert alert-warn" style="margin-top:14px;font-size:12px;">⚠ Atenção: a chave API fica armazenada localmente neste navegador. Não use em dispositivos compartilhados.</div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-card-title">Segurança</div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">Nova senha de acesso</label>
+          <div class="api-key-wrap" style="margin-top:6px;">
+            <input type="password" class="form-input" id="novaSenha" placeholder="Nova senha...">
+            <button class="btn btn-primary btn-sm" onclick="alterarSenha()">Salvar</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);">A senha é salva localmente neste navegador. Padrão: <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;">agencia2026</code></p>
       </div>
       <div class="settings-card" style="grid-column:1/-1">
         <div class="settings-card-title">Manutenção de Dados</div>
@@ -842,28 +879,59 @@ let chatTyping = false;
 let chatInitialized = false;
 
 // ============================================================
-// INIT
+// AUTENTICAÇÃO
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Inicializa na página portfolio
+const APP_PASSWORD_KEY = 'appPassword';
+const DEFAULT_PASSWORD = 'agencia2026';
+
+function tentarLogin() {
+  const input = document.getElementById('loginSenha');
+  const erro = document.getElementById('loginErro');
+  const senhaCorreta = localStorage.getItem(APP_PASSWORD_KEY) || DEFAULT_PASSWORD;
+  if (input.value === senhaCorreta) {
+    sessionStorage.setItem('auth', 'ok');
+    document.getElementById('loginOverlay').classList.remove('show');
+    inicializarSistema();
+  } else {
+    erro.textContent = 'Senha incorreta. Tente novamente.';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function alterarSenha() {
+  const nova = document.getElementById('novaSenha').value.trim();
+  if (!nova || nova.length < 4) { showToast('A senha deve ter ao menos 4 caracteres.'); return; }
+  localStorage.setItem(APP_PASSWORD_KEY, nova);
+  document.getElementById('novaSenha').value = '';
+  showToast('✓ Senha alterada com sucesso!');
+}
+
+function inicializarSistema() {
   showPage('portfolio');
-
-  // Set today's date on form
   document.getElementById('lancData').value = new Date().toISOString().split('T')[0];
-
-  // Load saved settings
   if (localStorage.getItem(API_URL_KEY)) {
     document.getElementById('sheetsApiUrl').value = apiUrl;
   }
   if (apiKey) {
     document.getElementById('anthropicKey').value = apiKey;
   }
-
   const mes = new Date().toLocaleString('pt-BR', {month:'long', year:'numeric'});
   document.getElementById('periodoAtual').textContent = mes.charAt(0).toUpperCase() + mes.slice(1);
-
   pingAPI();
   loadConsolidado();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('auth') !== 'ok') {
+    document.getElementById('loginOverlay').classList.add('show');
+    document.getElementById('loginSenha').focus();
+    return;
+  }
+  inicializarSistema();
 });
 
 // ============================================================
