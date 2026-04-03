@@ -411,6 +411,37 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .nota-preview-img.zoomed { max-height: none; cursor: zoom-out; }
 .nota-preview-pdf { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 20px; color: var(--text2); font-size: 13px; }
 .nota-preview-pdf a { color: var(--gold); text-decoration: none; font-weight: 500; }
+
+/* ===== EXPORTAÇÃO PDF ===== */
+@media print {
+  .sidebar, .topbar, .resumo-dia-bar,
+  .dre-selector, #dreFiltrosBar,
+  .dre-sidebar, .dre-charts-section,
+  #page-portfolio, #page-lancamentos, #page-chat,
+  #page-settings, #page-checklist, #page-empresa-chat,
+  #toast, .modal-overlay { display: none !important; }
+
+  body { background: #fff !important; }
+  .app { display: block !important; }
+  .main { display: block !important; }
+  .page { display: none !important; }
+  #page-dre { display: block !important; padding: 0 !important; }
+
+  .dre-container { display: block !important; }
+  .dre-table-wrap { border: none !important; box-shadow: none !important; width: 100% !important; }
+  .dre-table-title { background: #fff !important; border-bottom: 2px solid #333 !important; padding: 0 0 12px 0 !important; margin-bottom: 4px; }
+  .dre-table-title h3 { font-size: 20px !important; color: #1a1917 !important; }
+  .dre-table-title p { font-size: 13px !important; color: #5a5750 !important; }
+
+  #dreExportInfo { display: block !important; }
+  .dre-table { width: 100% !important; }
+  .dre-table tr.item td,
+  .dre-table tr.total td,
+  .dre-table tr.grand-total td,
+  .dre-table tr.section-header td { font-size: 12px !important; padding: 7px 12px !important; }
+}
+
+#dreExportInfo { display: none; font-size: 11px; color: #9a9590; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -533,14 +564,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
       <button class="dre-tab" onclick="selectDRETab('restaurante',this)">SM Restaurante</button>
       <button class="dre-tab" onclick="selectDRETab('riopreto',this)">SM Rio Preto</button>
     </div>
-    <!-- Seletor de período + Recalcular -->
-    <div style="display:flex;align-items:center;gap:10px;padding:0 0 16px 0;flex-wrap:wrap">
+    <!-- Seletor de período + Recalcular + Exportar PDF -->
+    <div id="dreFiltrosBar" style="display:flex;align-items:center;gap:10px;padding:0 0 16px 0;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--text3)">Período:</span>
       <select id="drePeriodoSelect" onchange="renderDRE(currentDREEmpresa)"
         style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 12px;cursor:pointer;outline:none;">
         <option value="">Carregando...</option>
       </select>
       <button id="btnRecalcularDRE" class="btn btn-ghost btn-sm" onclick="recalcularDRE()" title="Recalcula somando todos os lançamentos do período">↺ Recalcular DRE</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarDREPDF()" title="Exportar DRE como PDF">⬇ Exportar PDF</button>
       <span id="recalcularStatus" style="font-size:12px;color:var(--text3)"></span>
     </div>
     <div class="dre-container">
@@ -1413,6 +1445,26 @@ function renderGraficosDRE(empresaKey) {
   makeChart('chartReceita', receitas, '#1e7a4a', 'brl');
   makeChart('chartCMV',     cmvPcts,  '#b83232', 'pct', 40);
   makeChart('chartEBITDA',  ebitdas,  '#8a5f28', 'brl');
+}
+
+// ============================================================
+// EXPORTAR DRE PDF
+// ============================================================
+function exportarDREPDF() {
+  // Garante que a info de exportação seja visível na impressão
+  const infoEl = document.getElementById('dreExportInfo');
+  if (!infoEl) {
+    const titleWrap = document.getElementById('dreTitlePeriodo')?.parentElement;
+    if (titleWrap) {
+      const info = document.createElement('p');
+      info.id = 'dreExportInfo';
+      info.textContent = 'Gerado em ' + new Date().toLocaleString('pt-BR');
+      titleWrap.appendChild(info);
+    }
+  } else {
+    infoEl.textContent = 'Gerado em ' + new Date().toLocaleString('pt-BR');
+  }
+  window.print();
 }
 
 // ============================================================
