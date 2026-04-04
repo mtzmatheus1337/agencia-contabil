@@ -2704,29 +2704,26 @@ async function confirmarLancs() {
 
   let ok = 0, fail = 0;
 
-  // Salva todos em paralelo com data e fornecedor individuais por nota
-  const promises = sel.map(it => {
+  // Salva sequencialmente — Apps Script não suporta escrita concorrente (race condition de IDs)
+  for (const it of sel) {
     const grupo = itemGrupoMap[it.id] || { data: new Date().toISOString().split('T')[0], fornGrupo: '—' };
     const dataItem = grupo.data;
     const [ano, mes] = dataItem.split('-');
     const dataFmt = dataItem.split('-').reverse().join('/');
     const fornItem = it._fornecedorItem || grupo.fornGrupo;
     const descFinal = (it.quantidade ? '[' + it.quantidade + '] ' : '') + (it.descricao || '');
-    const payload = {
-      action: 'addLancamento', empresa: ecKey,
-      lancamento: { data: dataFmt, categoria: it.categoria, descricao: descFinal, valor: it.valor||0, fornecedor: fornItem, mes: parseInt(mes), ano: parseInt(ano) }
-    };
-    console.log('[confirmarLancs] enviando:', JSON.stringify(payload));
-    return postAPI(payload)
-    .then(r => { console.log('[confirmarLancs] resposta:', JSON.stringify(r)); return { ok: r.status === 'ok', descFinal, dataFmt, it }; })
-    .catch(e => { console.error('[confirmarLancs] erro na chamada:', e); return { ok: false, descFinal, dataFmt: '', it }; });
-  });
-
-  const results = await Promise.all(promises);
-  results.forEach(({ ok: success, descFinal, dataFmt, it }) => {
-    if (success) { ok++; addLogItem({descricao: descFinal, categoria: it.categoria, valor: it.valor||0, status: 'success', data: dataFmt}); }
-    else { fail++; addLogItem({descricao: descFinal, categoria: it.categoria, valor: it.valor||0, status: 'error', data: dataFmt}); }
-  });
+    try {
+      const r = await postAPI({
+        action: 'addLancamento', empresa: ecKey,
+        lancamento: { data: dataFmt, categoria: it.categoria, descricao: descFinal, valor: it.valor||0, fornecedor: fornItem, mes: parseInt(mes), ano: parseInt(ano) }
+      });
+      if (r.status === 'ok') { ok++; addLogItem({descricao: descFinal, categoria: it.categoria, valor: it.valor||0, status: 'success', data: dataFmt}); }
+      else { fail++; addLogItem({descricao: descFinal, categoria: it.categoria, valor: it.valor||0, status: 'error', data: dataFmt}); }
+    } catch(e) {
+      fail++;
+      addLogItem({descricao: descFinal, categoria: it.categoria, valor: it.valor||0, status: 'error', data: dataFmt});
+    }
+  }
 
   lancamentosCache[ecKey] = null;
   const msg = ok > 0 && !fail ? '✅ ' + ok + ' lançamento(s) salvos com sucesso!' :
