@@ -2782,24 +2782,26 @@ async function processarNFEmpresa(files) {
   filaDiv.className = 'emp-msg'; filaDiv.id = 'ecNFFila';
   filaDiv.innerHTML = '<div class="emp-avatar ai">✦</div>' +
     '<div class="nf-fila-wrap">' +
-    fl.map(f => '<div class="nf-fila-item" id="nfi-' + btoa(f.name).replace(/=/g,'') + '">' +
-      '<span id="nfi-ic-' + btoa(f.name).replace(/=/g,'') + '">⏳</span>' +
+    fl.map(f => { const sid = btoa(encodeURIComponent(f.name)).replace(/[=+/]/g,''); return '<div class="nf-fila-item" id="nfi-' + sid + '">' +
+      '<span id="nfi-ic-' + sid + '">⏳</span>' +
       '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
-      '<span id="nfi-st-' + btoa(f.name).replace(/=/g,'') + '" style="color:var(--text3);font-size:11px">aguardando</span>' +
-    '</div>').join('') + '</div>';
+      '<span id="nfi-st-' + sid + '" style="color:var(--text3);font-size:11px">aguardando</span>' +
+    '</div>'; }).join('') + '</div>';
   msgs.appendChild(filaDiv); msgs.scrollTop = msgs.scrollHeight;
 
   let allItens = [], fornFinal = '', dataNF = '', driveUrls = [], filePreviews = [];
 
   // Processa todos os arquivos em paralelo
   const resultados = await Promise.all(fl.map(async (file) => {
-    const sid = btoa(file.name).replace(/=/g,'');
-    const icEl = document.getElementById('nfi-ic-' + sid);
-    const stEl = document.getElementById('nfi-st-' + sid);
-    if (icEl) icEl.textContent = '🔄';
-    if (stEl) stEl.textContent = 'lendo...';
-
+    // sid dentro do try para não quebrar Promise.all com btoa em nomes não-ASCII
+    let icEl = null, stEl = null;
     try {
+      const sid = btoa(encodeURIComponent(file.name)).replace(/[=+/]/g,'');
+      icEl = document.getElementById('nfi-ic-' + sid);
+      stEl = document.getElementById('nfi-st-' + sid);
+      if (icEl) icEl.textContent = '🔄';
+      if (stEl) stEl.textContent = 'lendo...';
+
       const b64 = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = e => res(e.target.result.split(',')[1]);
@@ -2830,10 +2832,14 @@ async function processarNFEmpresa(files) {
         if (icEl) icEl.textContent = '✅';
         if (stEl) stEl.textContent = (parsed.itens?.length||0) + ' itens · Drive pendente...';
         return { ok: true, parsed, preview, b64, mt, fileName: file.name, stEl, icEl };
-      } else throw new Error('sem resposta IA');
+      } else {
+        console.error('[NF] Resposta inesperada da API Anthropic:', JSON.stringify(resIA));
+        throw new Error((resIA.error?.message || resIA.error?.type || 'sem content na resposta'));
+      }
     } catch(e) {
+      console.error('[NF] Erro ao processar "' + file.name + '":', e);
       if (icEl) icEl.textContent = '❌';
-      if (stEl) stEl.textContent = 'erro';
+      if (stEl) stEl.textContent = 'erro: ' + e.message.slice(0, 40);
       return { ok: false };
     }
   }));
