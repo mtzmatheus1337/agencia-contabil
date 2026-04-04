@@ -2772,210 +2772,133 @@ function exportarLog() {
 // ============================================================
 async function processarNFEmpresa(files) {
   if (!files?.length) return;
+  if (!anthropicKey) { showToast('Configure a chave API em Configurações'); return; }
 
   const fl = Array.from(files);
-  const total = fl.length;
-  const msgs = document.getElementById('ecMessages');
-  const m = COMPANIES_META[ecKey];
+  ecAppendMsg('ai', '📄 Recebendo ' + fl.length + ' arquivo(s)... Analisando com IA e salvando no Drive.');
 
-  // ── Fila visual com status individual por arquivo ──────────
+  const msgs = document.getElementById('ecMessages');
   const filaDiv = document.createElement('div');
   filaDiv.className = 'emp-msg'; filaDiv.id = 'ecNFFila';
   filaDiv.innerHTML = '<div class="emp-avatar ai">✦</div>' +
     '<div class="nf-fila-wrap">' +
-    fl.map(f =>
-      '<div class="nf-fila-item" id="nfi-' + nfSid(f.name) + '">' +
-        '<span id="nfi-ic-' + nfSid(f.name) + '">⏳</span>' +
-        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
-        '<span id="nfi-st-' + nfSid(f.name) + '" style="color:var(--text3);font-size:11px">aguardando</span>' +
-      '</div>'
-    ).join('') +
-    // Linha de progresso geral
-    '<div id="nfProgresso" style="padding:8px 12px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">' +
-      '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div>' +
-      '<span id="nfProgressoTxt">Processando ' + total + ' nota(s) simultaneamente...</span>' +
-    '</div>' +
-    '</div>';
+    fl.map(f => '<div class="nf-fila-item" id="nfi-' + btoa(f.name).replace(/=/g,'') + '">' +
+      '<span id="nfi-ic-' + btoa(f.name).replace(/=/g,'') + '">⏳</span>' +
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>' +
+      '<span id="nfi-st-' + btoa(f.name).replace(/=/g,'') + '" style="color:var(--text3);font-size:11px">aguardando</span>' +
+    '</div>').join('') + '</div>';
   msgs.appendChild(filaDiv); msgs.scrollTop = msgs.scrollHeight;
 
-  // ── Contador de progresso atualizado em tempo real ─────────
-  let concluidas = 0;
-  let falhas = 0;
+  let allItens = [], fornFinal = '', dataNF = '', driveUrls = [], filePreviews = [];
 
-  function atualizarProgresso(fileName, sucesso) {
-    concluidas++;
-    if (!sucesso) falhas++;
-    const txt = document.getElementById('nfProgressoTxt');
-    if (!txt) return;
-    const linhas = [];
-    if (concluidas - falhas > 0) linhas.push('✓ ' + (concluidas - falhas) + '/' + total + ' extraída(s)');
-    if (falhas > 0)              linhas.push('⚠️ ' + falhas + ' com erro');
-    if (concluidas < total)      linhas.push('⏳ aguardando ' + (total - concluidas) + '...');
-    txt.textContent = linhas.join(' · ');
-    if (concluidas === total) {
-      const spinner = document.querySelector('#nfProgresso .spinner');
-      if (spinner) spinner.style.display = 'none';
-    }
-  }
-
-  // ── Helpers ────────────────────────────────────────────────
-  function nfSid(name) { return btoa(encodeURIComponent(name)).replace(/[=+/]/g,''); }
-
-  function nfEl(prefix, name) { return document.getElementById(prefix + nfSid(name)); }
-
-  function toBase64(file) {
-    return new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = e => res(e.target.result.split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-  }
-
-  const NF_PROMPT = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. IMPORTANTE: (1) extraia a data da nota fiscal como campo "_dataNF" no formato YYYY-MM-DD (ex: "2026-03-15") — se nao encontrada retorne "_dataNF": null, NUNCA invente a data; (2) extraia o CNPJ do emitente como "_cnpj" no formato "XX.XXX.XXX/XXXX-XX" — se nao encontrado retorne "_cnpj": null; (3) extraia o valor total da nota (subtotal ou total geral) como "_totalNF" (numero, ex: 1234.56) — se nao encontrado retorne "_totalNF": null. Responda SOMENTE JSON sem markdown: {"fornecedor":"","_cnpj":"XX.XXX.XXX/XXXX-XX","data":"DD/MM/AAAA","nf_numero":"","_dataNF":"YYYY-MM-DD","_totalNF":0.00,"itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
-
-  // ── Conversão base64 de todos os arquivos em paralelo ──────
-  const b64Results = await Promise.allSettled(fl.map(f => toBase64(f)));
-
-  // ── Chamadas IA — uma por arquivo, todas simultâneas ───────
-  const iaPromises = fl.map(async (file, idx) => {
-    const icEl = nfEl('nfi-ic-', file.name);
-    const stEl = nfEl('nfi-st-', file.name);
-
-    // Se base64 falhou, registra erro imediatamente
-    if (b64Results[idx].status === 'rejected') {
-      if (icEl) icEl.textContent = '⚠️';
-      if (stEl) stEl.textContent = 'erro leitura';
-      atualizarProgresso(file.name, false);
-      return { ok: false, fileName: file.name };
-    }
-
-    const b64 = b64Results[idx].value;
-    const mt  = file.type === 'application/pdf' ? 'application/pdf'
-              : file.type === 'image/png'        ? 'image/png'
-              :                                    'image/jpeg';
-
+  // Processa todos os arquivos em paralelo
+  const resultados = await Promise.all(fl.map(async (file) => {
+    const sid = btoa(file.name).replace(/=/g,'');
+    const icEl = document.getElementById('nfi-ic-' + sid);
+    const stEl = document.getElementById('nfi-st-' + sid);
     if (icEl) icEl.textContent = '🔄';
-    if (stEl) stEl.textContent = 'enviando IA...';
+    if (stEl) stEl.textContent = 'lendo...';
 
     try {
-      const mc = file.type === 'application/pdf'
-        ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:NF_PROMPT}]
-        : [{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:NF_PROMPT}];
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = e => res(e.target.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
 
-      if (!anthropicKey) throw new Error('Chave Anthropic não configurada. Acesse Configurações e insira a chave.');
+      const mt = file.type === 'application/pdf' ? 'application/pdf' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const m = COMPANIES_META[ecKey];
+
+      if (stEl) stEl.textContent = 'lendo IA...';
+      const prompt = 'Leia esta nota fiscal da empresa "' + m.name + '". Extraia TODOS os itens com seus valores totais. Para cada item extraia: descricao (nome do produto/servico), quantidade (numero + unidade, ex: "6x5kg", "2 CX", "10 UN", "1 vb"), valor_unitario (preco unitario se disponivel, senao 0), valor (valor TOTAL do item), categoria (classifique em: Receita Bruta, CMV, Custo com Pessoal, Embalagens, Higiene e Limpeza, Consumo Interno, Marketing / Patrocinio, Despesas Operacionais, Despesas Fixas, Despesas Diversas ou Manutencao). CMV = insumos, alimentos, bebidas, materia-prima. Extraia tambem: data (DD/MM/AAAA), fornecedor/emitente, numero NF. IMPORTANTE: extraia a data da nota fiscal como campo "_dataNF" no formato YYYY-MM-DD (ex: "2026-03-15"). Se a data nao estiver legivel ou nao for encontrada, retorne "_dataNF": null — NUNCA invente ou assuma a data de hoje. Responda SOMENTE JSON sem markdown: {"fornecedor":"","data":"DD/MM/AAAA","nf_numero":"","_dataNF":"YYYY-MM-DD","itens":[{"descricao":"","quantidade":"","valor_unitario":0.00,"valor":0.00,"categoria":"CMV"}]}';
+
+      const mc = file.type === 'application/pdf'
+        ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
+        : [{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:prompt}];
+
+      // Apenas IA em paralelo — Drive será feito depois, um por vez
       const resIA = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({model:'claude-sonnet-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:mc}]}),
-      });
-      const dataIA = await resIA.json();
+        headers: {'Content-Type':'application/json','x-api-key':anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({model:'claude-sonnet-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:mc}]})
+      }).then(r => r.json());
 
-      if (dataIA.content?.[0]) {
-        const parsed = JSON.parse(dataIA.content[0].text.replace(/```json|```/g,'').trim());
-        const nItens = parsed.itens?.length || 0;
+      if (resIA.content?.[0]) {
+        const parsed = JSON.parse(resIA.content[0].text.replace(/```json|```/g,'').trim());
+        const preview = { name: file.name, b64, mimeType: mt };
         if (icEl) icEl.textContent = '✅';
-        if (stEl) stEl.textContent = nItens + ' iten(s) · Drive pendente...';
-        atualizarProgresso(file.name, true);
-        return { ok: true, parsed, preview: { name: file.name, b64, mimeType: mt }, b64, mt, fileName: file.name, stEl };
-      }
-      throw new Error('Anthropic HTTP ' + resIA.status + ': ' + JSON.stringify(dataIA).substring(0, 200));
-
+        if (stEl) stEl.textContent = (parsed.itens?.length||0) + ' itens · Drive pendente...';
+        return { ok: true, parsed, preview, b64, mt, fileName: file.name, stEl, icEl };
+      } else throw new Error('sem resposta IA');
     } catch(e) {
-      if (icEl) icEl.textContent = '⚠️';
-      if (stEl) stEl.textContent = 'não extraída';
-      atualizarProgresso(file.name, false);
-      // Retorna erro estruturado para aparecer no card (item 3)
-      return { ok: false, fileName: file.name };
+      if (icEl) icEl.textContent = '❌';
+      if (stEl) stEl.textContent = 'erro';
+      return { ok: false };
     }
+  }));
+
+  // Consolida resultados da IA
+  const iaOk = resultados.filter(r => r.ok);
+  iaOk.forEach((res) => {
+    const { parsed, preview, fileName } = res;
+    const fileIndex = filePreviews.length;
+    filePreviews.push(preview);
+    // Prioriza o campo _dataNF (YYYY-MM-DD); fallback para data DD/MM/AAAA; null se ausente
+    let dataNFInput = null;
+    if (parsed._dataNF) {
+      dataNFInput = parsed._dataNF; // já em YYYY-MM-DD
+    } else if (parsed.data) {
+      const pts = parsed.data.split('/');
+      if (pts.length === 3 && pts[2].length === 4) dataNFInput = pts[2] + '-' + pts[1].padStart(2,'0') + '-' + pts[0].padStart(2,'0');
+    }
+    allItens = allItens.concat((parsed.itens || []).map(it => ({
+      ...it,
+      _nota: fileName,
+      _notaIdx: fileIndex,
+      _dataNF: dataNFInput, // null se não encontrado
+      _fornecedor: parsed.fornecedor || ''
+    })));
+    if (!fornFinal && parsed.fornecedor) fornFinal = parsed.fornecedor;
+    if (!dataNF && parsed.data) dataNF = parsed.data;
   });
 
-  // Promise.allSettled — nunca cancela as demais se uma falhar
-  const settled = await Promise.allSettled(iaPromises);
-  const resultados = settled.map(s => s.status === 'fulfilled' ? s.value : { ok: false, fileName: '?' });
-
-  // ── Consolida resultados da IA ─────────────────────────────
-  let allItens = [], fornFinal = '', dataNF = '', filePreviews = [];
-
-  resultados.forEach(res => {
-    if (res.ok) {
-      const { parsed, preview, fileName } = res;
-      const fileIndex = filePreviews.length;
-      filePreviews.push(preview);
-      let dataNFInput = null;
-      if (parsed._dataNF) {
-        dataNFInput = parsed._dataNF;
-      } else if (parsed.data) {
-        const pts = parsed.data.split('/');
-        if (pts.length === 3 && pts[2].length === 4) dataNFInput = pts[2] + '-' + pts[1].padStart(2,'0') + '-' + pts[0].padStart(2,'0');
-      }
-      allItens = allItens.concat((parsed.itens || []).map(it => ({
-        ...it,
-        _nota: fileName,
-        _notaIdx: fileIndex,
-        _dataNF: dataNFInput,
-        _fornecedor: parsed.fornecedor || '',
-        _cnpj: parsed._cnpj || null,
-        _totalNF: parsed._totalNF || null,
-      })));
-      if (!fornFinal && parsed.fornecedor) fornFinal = parsed.fornecedor;
-      if (!dataNF && parsed.data) dataNF = parsed.data;
-    } else {
-      // Arquivo com falha → placeholder no card de confirmação
-      allItens.push({
-        _error: true,
-        _nota: res.fileName,
-        _notaIdx: filePreviews.length,
-        descricao: '⚠️ Nota "' + res.fileName + '" — não foi possível extrair. Anexe novamente.',
-        categoria: 'CMV',
-        valor: 0,
-        _dataNF: null,
-        _fornecedor: '',
-        _cnpj: null,
-        _totalNF: null,
-      });
-      filePreviews.push(null); // sem preview para erros
-    }
-  });
-
-  // ── Upload Drive — sequencial para não saturar Apps Script ─
-  const driveUrls = [];
-  for (const res of resultados.filter(r => r.ok)) {
+  // Upload Drive sequencial com delay para não sobrecarregar Apps Script
+  for (const res of iaOk) {
     const { parsed, b64, mt, fileName, stEl } = res;
-    const forn  = parsed.fornecedor || '_Sem Fornecedor';
+    const forn = parsed.fornecedor || '_Sem Fornecedor';
     const nItens = parsed.itens?.length || 0;
     try {
-      if (stEl) stEl.textContent = nItens + ' iten(s) · Drive...';
+      if (stEl) stEl.textContent = nItens + ' itens · Drive...';
       const driveRes = await postAPI({
-        action: 'uploadNota', empresa: ecKey, fileName, base64Data: b64, mimeType: mt,
+        action: 'uploadNota',
+        empresa: ecKey,
+        fileName,
+        base64Data: b64,
+        mimeType: mt,
         fornecedor: forn,
         descricao: 'NF ' + forn + ' — ' + (parsed.data || new Date().toLocaleDateString('pt-BR'))
       });
       if (driveRes.status === 'ok' && driveRes.result?.fileUrl) {
         driveUrls.push({ name: fileName, url: driveRes.result.fileUrl, folderUrl: driveRes.result.folderUrl, pasta: driveRes.result.pasta });
-        if (stEl) stEl.textContent = '✅ ' + nItens + ' iten(s) · Drive ✓';
+        if (stEl) stEl.textContent = '✅ ' + nItens + ' itens · Drive ✓';
       } else {
-        if (stEl) stEl.textContent = '✅ ' + nItens + ' iten(s) · Drive ✗';
+        if (stEl) stEl.textContent = '✅ ' + nItens + ' itens · Drive ✗';
       }
     } catch(e) {
-      if (stEl) stEl.textContent = '✅ ' + nItens + ' iten(s) · Drive ✗';
+      if (stEl) stEl.textContent = '✅ ' + nItens + ' itens · Drive ✗';
     }
+    // Pequeno delay entre uploads para não saturar Apps Script
     await new Promise(r => setTimeout(r, 800));
   }
 
+  // Mostra link do Drive se upload funcionou
   if (driveUrls.length > 0 && driveUrls[0].folderUrl) {
     const link = document.getElementById('driveFolderLink');
     if (link) { link.href = driveUrls[0].folderUrl; link.style.display = 'inline-flex'; }
   }
 
-  // Itens válidos (exclui placeholders de erro para checar se há algo útil)
-  const itensValidos = allItens.filter(it => !it._error);
-  if (!itensValidos.length && !allItens.length) {
+  if (!allItens.length) {
     ecAppendMsg('ai', '❌ Não consegui extrair itens. Tente imagens mais nítidas ou descreva manualmente.');
     return;
   }
@@ -2983,13 +2906,15 @@ async function processarNFEmpresa(files) {
   let dInp = '';
   if (dataNF) { const pts = dataNF.split('/'); if (pts.length === 3) dInp = pts[2] + '-' + pts[1] + '-' + pts[0]; }
 
-  const driveMsg = driveUrls.length > 0
-    ? '\n📁 Salvo no Drive: ' + [...new Set(driveUrls.map(d => d.pasta).filter(Boolean))].join(', ')
-    : '';
+  let driveMsg = '';
+  if (driveUrls.length > 0) {
+    const pastas = [...new Set(driveUrls.map(d => d.pasta).filter(Boolean))];
+    driveMsg = '\n📁 Salvo no Drive: ' + (pastas.length > 0 ? pastas.join(', ') : driveUrls.length + ' arquivo(s)');
+  }
 
-  const errosMsg = falhas > 0 ? ' (' + falhas + ' nota(s) com erro)' : '';
-  ecAppendMsg('ai', '✓ ' + itensValidos.length + ' iten(s) extraídos' + errosMsg + '.' + driveMsg + '\nRevise e confirme:');
+  ecAppendMsg('ai', '✓ ' + allItens.length + ' itens extraídos.' + driveMsg + '\nRevise e confirme:');
 
+  // Mostra previews das notas + card de confirmação
   ecShowConfirmComPreview(allItens, fornFinal, dInp, filePreviews);
 }
 
