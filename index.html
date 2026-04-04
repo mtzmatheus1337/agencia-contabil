@@ -2431,7 +2431,7 @@ function ecShowConfirmComPreview(itens, fornecedor, dataStr, previews) {
     const itensGrupo = gruposMap[keyGrupo];
     const previewIdx = parseInt(keyGrupo);
     const preview = !isNaN(previewIdx) && previews?.[previewIdx] ? previews[previewIdx] :
-                    (previews || []).find(p => p.name === keyGrupo);
+                    (previews || []).find(p => p && p.name === keyGrupo);
     const nomeArq = preview ? preview.name : (itensGrupo[0]?._nota || keyGrupo);
     const isImg = preview && (preview.mimeType === 'image/jpeg' || preview.mimeType === 'image/png' || preview.mimeType === 'image/gif' || preview.mimeType === 'image/webp');
     const isPdf = preview && preview.mimeType === 'application/pdf';
