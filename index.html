@@ -706,15 +706,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
       </div>
       <div class="settings-card">
         <div class="settings-card-title">Chave API Anthropic (IA)</div>
-        <div class="alert alert-ok" id="anthropicKeyStatus" style="font-size:12px;">A chave é salva no servidor (Apps Script) — nunca exposta ao navegador.</div>
+        <div class="alert alert-ok" id="anthropicKeyStatus" style="font-size:12px;">Chave não configurada neste dispositivo.</div>
         <div class="form-group">
-          <label class="form-label">Chave de API — configurar no servidor</label>
+          <label class="form-label">Chave de API (sk-ant-...)</label>
           <div class="api-key-wrap">
             <input type="password" class="form-input" id="anthropicKeyInput" placeholder="sk-ant-...">
-            <button class="btn btn-primary btn-sm" onclick="salvarAnthropicKey()">Salvar no servidor</button>
+            <button class="btn btn-primary btn-sm" onclick="salvarAnthropicKey()">Salvar</button>
           </div>
         </div>
-        <p style="font-size:12px;color:var(--text3);margin-top:12px;">A chave é armazenada nas PropertiesService do Apps Script. Basta configurar uma vez — todos os dispositivos a utilizam automaticamente.</p>
+        <p style="font-size:12px;color:var(--text3);margin-top:12px;">Salva localmente neste dispositivo (usada para leitura de NFs) e também no servidor Apps Script (usada pelo chat). Configure nos demais dispositivos que forem usar NFs.</p>
       </div>
       <div class="settings-card">
         <div class="settings-card-title">Segurança</div>
@@ -918,8 +918,11 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 // CONFIGURAÇÃO
 // ============================================================
 const API_URL_KEY = 'agencia_api_url';
+const ANTHROPIC_KEY_STORAGE = 'agencia_anthropic_key';
 
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbww1db3RzmQTzwfdGm8BRLJ9SlWGnhYj3K0aKFmBdOrGJd7tL6DXQJWFgJgjnkd5y-j/exec';
+
+let anthropicKey = localStorage.getItem(ANTHROPIC_KEY_STORAGE) || '';
 
 const COMPANIES_META = {
   containers: { name: 'Containers Hamburgueria', tipo: 'Hamburgueria · Jales/SP', cor: '#e05252', idx: 0 },
@@ -971,6 +974,10 @@ function inicializarSistema() {
   document.getElementById('lancData').value = new Date().toISOString().split('T')[0];
   if (localStorage.getItem(API_URL_KEY)) {
     document.getElementById('sheetsApiUrl').value = apiUrl;
+  }
+  if (anthropicKey) {
+    document.getElementById('anthropicKeyStatus').textContent = '✓ Chave local configurada (usada nas NFs).';
+    document.getElementById('anthropicKeyStatus').className = 'alert alert-ok';
   }
   const mes = new Date().toLocaleString('pt-BR', {month:'long', year:'numeric'});
   document.getElementById('periodoAtual').textContent = mes.charAt(0).toUpperCase() + mes.slice(1);
@@ -2193,22 +2200,25 @@ async function salvarAnthropicKey() {
   const key = document.getElementById('anthropicKeyInput').value.trim();
   if (!key || !key.startsWith('sk-')) { showToast('Chave inválida — deve começar com sk-'); return; }
   const statusEl = document.getElementById('anthropicKeyStatus');
-  statusEl.textContent = 'Salvando no servidor...';
-  statusEl.className = 'alert alert-info';
+
+  // Salva localmente (para chamadas diretas de NF)
+  localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
+  anthropicKey = key;
+  document.getElementById('anthropicKeyInput').value = '';
+  statusEl.textContent = '✓ Chave salva localmente. Enviando ao servidor...';
+  statusEl.className = 'alert alert-ok';
+
+  // Salva no servidor (para o proxy do chat) — fire-and-forget
   try {
     const r = await postAPI({ action: 'salvarAnthropicKey', key });
     if (r.status === 'ok') {
-      document.getElementById('anthropicKeyInput').value = '';
-      statusEl.textContent = '✓ Chave salva no servidor com sucesso!';
-      statusEl.className = 'alert alert-ok';
-      showToast('✓ Chave Anthropic salva no servidor!');
+      statusEl.textContent = '✓ Chave salva localmente e no servidor.';
+      showToast('✓ Chave Anthropic salva!');
     } else {
-      statusEl.textContent = '✗ Erro: ' + (r.message || 'falha');
-      statusEl.className = 'alert alert-warn';
+      statusEl.textContent = '✓ Local OK · Servidor: ' + (r.message || 'falha');
     }
   } catch(e) {
-    statusEl.textContent = '✗ Erro de conexão';
-    statusEl.className = 'alert alert-warn';
+    statusEl.textContent = '✓ Local OK · Servidor: erro de conexão';
   }
 }
 
@@ -2853,17 +2863,28 @@ async function processarNFEmpresa(files) {
         ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:NF_PROMPT}]
         : [{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:NF_PROMPT}];
 
-      const proxyIA = await postAnthropic({model:'claude-sonnet-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:mc}]});
+      if (!anthropicKey) throw new Error('Chave Anthropic não configurada. Acesse Configurações e insira a chave.');
+      const resIA = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({model:'claude-sonnet-4-5-20251001', max_tokens:2000, messages:[{role:'user',content:mc}]}),
+      });
+      const dataIA = await resIA.json();
 
-      if (proxyIA.status === 'ok' && proxyIA.data?.content?.[0]) {
-        const parsed = JSON.parse(proxyIA.data.content[0].text.replace(/```json|```/g,'').trim());
+      if (dataIA.content?.[0]) {
+        const parsed = JSON.parse(dataIA.content[0].text.replace(/```json|```/g,'').trim());
         const nItens = parsed.itens?.length || 0;
         if (icEl) icEl.textContent = '✅';
         if (stEl) stEl.textContent = nItens + ' iten(s) · Drive pendente...';
         atualizarProgresso(file.name, true);
         return { ok: true, parsed, preview: { name: file.name, b64, mimeType: mt }, b64, mt, fileName: file.name, stEl };
       }
-      throw new Error('ERRO PROXY NF: ' + JSON.stringify(proxyIA));
+      throw new Error('Anthropic HTTP ' + resIA.status + ': ' + JSON.stringify(dataIA).substring(0, 200));
 
     } catch(e) {
       if (icEl) icEl.textContent = '⚠️';
