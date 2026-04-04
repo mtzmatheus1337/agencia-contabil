@@ -116,33 +116,77 @@ function doPost(e) {
 }
 
 // ============================================================
-// PROXY ANTHROPIC (item 1)
+// PROXY ANTHROPIC
 // ============================================================
 function proxyAnthropic(body) {
+  // — 1. VERIFICAÇÕES PRÉ-CHAMADA —
   const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_KEY');
-  if (!key) {
-    return { status: 'error', message: 'Chave Anthropic não configurada. Acesse Configurações e informe a chave.' };
+  const keyOk  = !!key;
+  const keyFmt = keyOk && key.startsWith('sk-ant-');
+  Logger.log('[proxy] key existe=' + keyOk + ' formato_valido=' + keyFmt
+             + ' prefixo=' + (keyOk ? key.substring(0, 14) + '...' : 'N/A'));
+
+  if (!keyOk)  return { status: 'error', message: 'ANTHROPIC_KEY não encontrada nas PropertiesService.' };
+  if (!keyFmt) return { status: 'error', message: 'ANTHROPIC_KEY com formato inválido (esperado: sk-ant-...). Prefixo recebido: ' + key.substring(0, 10) };
+
+  const model    = body.model    || 'claude-haiku-4-5-20251001';
+  const maxTok   = body.max_tokens || 800;
+  const messages = body.messages;
+  const system   = body.system;
+
+  Logger.log('[proxy] model=' + model + ' max_tokens=' + maxTok);
+  Logger.log('[proxy] messages existe=' + !!messages + ' qtd=' + (Array.isArray(messages) ? messages.length : 'N/A'));
+  Logger.log('[proxy] system existe=' + !!system);
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return { status: 'error', message: 'body.messages ausente ou vazio.' };
   }
 
-  const payload = { model: body.model || 'claude-haiku-4-5-20251001', max_tokens: body.max_tokens || 800 };
-  if (body.system)   payload.system   = body.system;
-  if (body.messages) payload.messages = body.messages;
+  // — 2. MONTAR PAYLOAD —
+  const payload = { model, max_tokens: maxTok, messages };
+  if (system) payload.system = system;
 
+  const payloadStr = JSON.stringify(payload);
+  Logger.log('[proxy] payload bytes=' + payloadStr.length);
+
+  // — 3. CHAMADA URLFETCHAPP —
+  let res;
   try {
-    const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
+        'Content-Type':      'application/json',
+        'x-api-key':         key,
         'anthropic-version': '2023-06-01',
       },
-      payload: JSON.stringify(payload),
+      payload: payloadStr,
       muteHttpExceptions: true,
     });
-    const data = JSON.parse(res.getContentText());
+  } catch (fetchErr) {
+    Logger.log('[proxy] ERRO no UrlFetchApp.fetch: ' + fetchErr.message);
+    return { status: 'error', message: 'UrlFetchApp falhou: ' + fetchErr.message };
+  }
+
+  // — 4. TRATAR RESPOSTA —
+  const httpCode   = res.getResponseCode();
+  const rawBody    = res.getContentText();
+  Logger.log('[proxy] httpCode=' + httpCode + ' responseBody=' + rawBody.substring(0, 500));
+
+  if (httpCode !== 200) {
+    return {
+      status:       'error',
+      message:      'Anthropic retornou HTTP ' + httpCode,
+      httpCode:     httpCode,
+      responseBody: rawBody.substring(0, 500),
+    };
+  }
+
+  try {
+    const data = JSON.parse(rawBody);
     return { status: 'ok', data };
-  } catch (err) {
-    return { status: 'error', message: 'Erro ao chamar Anthropic: ' + err.message };
+  } catch (parseErr) {
+    Logger.log('[proxy] ERRO ao parsear JSON da resposta: ' + parseErr.message);
+    return { status: 'error', message: 'Resposta da Anthropic não é JSON válido: ' + rawBody.substring(0, 200) };
   }
 }
 

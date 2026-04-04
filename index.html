@@ -2154,7 +2154,7 @@ async function sendChat() {
 
   try {
     const proxy = await postAnthropic({ model: 'claude-haiku-4-5-20251001', max_tokens: 800, system: chatSystemPrompt || buildSystemPrompt(), messages: chatHistory.slice(-10) });
-    const data = proxy.status === 'ok' ? proxy.data : { error: { message: proxy.message || 'Erro no servidor' } };
+    const data = proxy.status === 'ok' ? proxy.data : { error: { message: 'ERRO PROXY: ' + JSON.stringify(proxy) } };
     document.getElementById('typingIndicator')?.remove();
     chatTyping = false; document.getElementById('chatSendBtn').disabled = false;
     if (data.content?.[0]) {
@@ -2162,7 +2162,7 @@ async function sendChat() {
       chatHistory.push({ role: 'assistant', content: reply });
       appendChatMsg('ai', reply);
     } else if (data.error) {
-      appendChatMsg('ai', 'Erro: ' + data.error.message);
+      appendChatMsg('ai', data.error.message);
     }
   } catch(e) {
     document.getElementById('typingIndicator')?.remove();
@@ -2863,7 +2863,7 @@ async function processarNFEmpresa(files) {
         atualizarProgresso(file.name, true);
         return { ok: true, parsed, preview: { name: file.name, b64, mimeType: mt }, b64, mt, fileName: file.name, stEl };
       }
-      throw new Error(proxyIA.message || 'sem resposta IA');
+      throw new Error('ERRO PROXY NF: ' + JSON.stringify(proxyIA));
 
     } catch(e) {
       if (icEl) icEl.textContent = '⚠️';
@@ -3246,7 +3246,7 @@ async function enviarMsgEmpresa() {
 
   try {
     const proxy = await postAnthropic({model:'claude-haiku-4-5-20251001',max_tokens:600,system,messages:ecHistory.slice(-12)});
-    const d = proxy.status === 'ok' ? proxy.data : { error: { message: proxy.message || 'Erro no servidor' } };
+    const d = proxy.status === 'ok' ? proxy.data : { error: { message: 'ERRO PROXY: ' + JSON.stringify(proxy) } };
     document.getElementById('ecTyping')?.remove();
     ecTyping = false; document.getElementById('ecSendBtn').disabled = false;
 
