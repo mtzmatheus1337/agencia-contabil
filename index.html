@@ -2711,12 +2711,14 @@ async function confirmarLancs() {
     const dataFmt = dataItem.split('-').reverse().join('/');
     const fornItem = it._fornecedorItem || grupo.fornGrupo;
     const descFinal = (it.quantidade ? '[' + it.quantidade + '] ' : '') + (it.descricao || '');
-    return postAPI({
+    const payload = {
       action: 'addLancamento', empresa: ecKey,
       lancamento: { data: dataFmt, categoria: it.categoria, descricao: descFinal, valor: it.valor||0, fornecedor: fornItem, mes: parseInt(mes), ano: parseInt(ano) }
-    })
-    .then(r => ({ ok: r.status === 'ok', descFinal, dataFmt, it }))
-    .catch(() => ({ ok: false, descFinal, dataFmt: '', it }));
+    };
+    console.log('[confirmarLancs] enviando:', JSON.stringify(payload));
+    return postAPI(payload)
+    .then(r => { console.log('[confirmarLancs] resposta:', JSON.stringify(r)); return { ok: r.status === 'ok', descFinal, dataFmt, it }; })
+    .catch(e => { console.error('[confirmarLancs] erro na chamada:', e); return { ok: false, descFinal, dataFmt: '', it }; });
   });
 
   const results = await Promise.all(promises);
