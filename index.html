@@ -1589,7 +1589,8 @@ async function renderLancamentos() {
     });
   }
 
-  all.sort((a, b) => new Date(b['Data']) - new Date(a['Data']));
+  const toIso = d => { if (!d) return ''; if (d.includes('/')) { const [dd,mm,yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; } return d; };
+  all.sort((a, b) => toIso(b['Data']).localeCompare(toIso(a['Data'])));
 
   if (all.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><h3>Nenhum lançamento encontrado</h3></div></td></tr>';
